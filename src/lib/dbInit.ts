@@ -1,0 +1,48 @@
+import { sql } from "drizzle-orm";
+import { db } from "@/db";
+
+const globalInit = globalThis as typeof globalThis & {
+  __polhubSchemaReady?: Promise<void>;
+};
+
+/**
+ * Tworzy tabele, jeśli ich nie ma (np. świeża baza po restarcie środowiska).
+ * Uruchamiane leniwie i tylko raz na proces.
+ */
+export function ensureSchema(): Promise<void> {
+  if (!globalInit.__polhubSchemaReady) {
+    globalInit.__polhubSchemaReady = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS videos (
+          id SERIAL PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          category TEXT NOT NULL DEFAULT 'Amatorskie',
+          uploader TEXT NOT NULL DEFAULT 'Gnam',
+          file_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL DEFAULT 'video/mp4',
+          file_size INTEGER NOT NULL DEFAULT 0,
+          duration_seconds INTEGER NOT NULL DEFAULT 0,
+          thumbnail TEXT,
+          data BYTEA NOT NULL,
+          views INTEGER NOT NULL DEFAULT 0,
+          likes INTEGER NOT NULL DEFAULT 0,
+          dislikes INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    })().catch((err) => {
+      globalInit.__polhubSchemaReady = undefined;
+      throw err;
+    });
+  }
+  return globalInit.__polhubSchemaReady;
+}
