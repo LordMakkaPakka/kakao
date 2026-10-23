@@ -9,6 +9,8 @@ import {
   ThumbsUp,
   MessageSquare,
   LogIn,
+  CornerDownRight,
+  Trash2,
 } from "lucide-react";
 import { authFetch, fetchMe, getToken } from "@/lib/clientAuth";
 import { isVerified } from "@/lib/verified";
@@ -43,7 +45,7 @@ function Avatar({ username, size = 40 }: { username: string; size?: number }) {
   );
 }
 
-function LikeButtons({
+function VoteButtons({
   comment,
   disabled,
   onVote,
@@ -53,7 +55,7 @@ function LikeButtons({
   onVote: (type: "like" | "dislike") => void;
 }) {
   return (
-    <div className="mt-2 flex items-center gap-1.5">
+    <>
       <button
         type="button"
         onClick={() => onVote("like")}
@@ -82,10 +84,7 @@ function LikeButtons({
       >
         <ThumbsDown className="h-3.5 w-3.5" /> {comment.dislikes}
       </button>
-      <span className="ml-1 text-xs text-ph-muted">
-        {comment.myVote ? "Twój głos" : ""}
-      </span>
-    </div>
+    </>
   );
 }
 
@@ -105,10 +104,36 @@ export default function Comments({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingVote, setPendingVote] = useState<number | null>(null);
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   const count = list.length;
   const trimmed = text.trim();
-  const charCount = useMemo(() => text.length, [text]);
+  const charCount = text.length;
+
+  // Komentarze główne + odpowiedzi przypięte do nich (maks. jeden poziom).
+  const tree = useMemo(() => {
+    const roots: CommentItem[] = [];
+    const byParent = new Map<number, CommentItem[]>();
+    for (const c of list) {
+      if (c.parentId === null) {
+        roots.push(c);
+      } else {
+        const arr = byParent.get(c.parentId) ?? [];
+        arr.push(c);
+        byParent.set(c.parentId, arr);
+      }
+    }
+    const newestFirst = (a: CommentItem, b: CommentItem) =>
+      b.createdAt.localeCompare(a.createdAt);
+    const oldestFirst = (a: CommentItem, b: CommentItem) =>
+      a.createdAt.localeCompare(b.createdAt);
+    roots.sort(newestFirst);
+    for (const arr of byParent.values()) arr.sort(oldestFirst);
+    return { roots, byParent };
+  }, [list]);
 
   // Gdy ciasteczka są blokowane (podgląd w iframe), sesję potwierdzamy
   // tokenem z localStorage i dociągamy komentarze wraz z moim głosem.
@@ -143,34 +168,111 @@ export default function Comments({
     };
   }, [initialMe, videoId]);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!trimmed || sending) return;
+  /** Wysyła komentarz lub odpowiedź. Zwraca utworzony wpis albo null. */
+  async function postComment(
+    raw: string,
+    parentId: number | null
+  ): Promise<CommentItem | null> {
+    const body = raw.trim();
+    if (!body) return null;
     if (!me && !getToken()) {
-      setError("Musisz się zalogować, aby dodać komentarz.");
-      return;
+      setError("Musisz się zalogować, aby komentować.");
+      return null;
     }
-    setSending(true);
+    if (body.length > MAX_LEN) {
+      setError(`Komentarz może mieć maksymalnie ${MAX_LEN} znaków.`);
+      return null;
+    }
     setError(null);
     try {
       const res = await authFetch(`/api/videos/${videoId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: trimmed }),
+        body: JSON.stringify({ body, parentId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Nie udało się dodać komentarza.");
+        return null;
+      }
+      const created = data.comment as CommentItem;
+      setList((prev) => [created, ...prev]);
+      setMe(created.username);
+      setNotice(null);
+      return created;
+    } catch {
+      setError("Błąd połączenia. Spróbuj ponownie.");
+      return null;
+    }
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!trimmed || sending || replySending) return;
+    setSending(true);
+    const created = await postComment(trimmed, null);
+    if (created) setText("");
+    setSending(false);
+  }
+
+  function openReply(comment: CommentItem) {
+    if (!me) {
+      setNotice("Zaloguj się, aby odpowiadać na komentarze.");
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    setReplyTo(comment.id);
+    // Odpowiedź na odpowiedź trafia do tego samego wątku – oznaczamy adresata.
+    setReplyText(comment.parentId !== null ? `@${comment.username} ` : "");
+  }
+
+  function closeReply() {
+    setReplyTo(null);
+    setReplyText("");
+  }
+
+  async function submitReply(comment: CommentItem) {
+    if (!replyText.trim() || replySending) return;
+    setReplySending(true);
+    const created = await postComment(replyText, comment.id);
+    if (created) closeReply();
+    setReplySending(false);
+  }
+
+  async function removeComment(comment: CommentItem) {
+    if (deleting !== null) return;
+    const question =
+      comment.parentId === null
+        ? "Usunąć ten komentarz razem z odpowiedziami? Tego nie da się cofnąć."
+        : "Usunąć tę odpowiedź? Tego nie da się cofnąć.";
+    if (!confirm(question)) return;
+
+    setDeleting(comment.id);
+    setError(null);
+    try {
+      const res = await authFetch(`/api/comments/${comment.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się usunąć komentarza.");
         return;
       }
-      setList((prev) => [data.comment as CommentItem, ...prev]);
-      setMe(data.comment.username as string);
-      setText("");
-      setNotice(null);
+      const removedReplyTo =
+        replyTo !== null &&
+        (replyTo === comment.id ||
+          list.some((c) => c.id === replyTo && c.parentId === comment.id));
+      setList((prev) =>
+        prev.filter(
+          (c) => c.id !== comment.id && c.parentId !== comment.id
+        )
+      );
+      if (removedReplyTo) closeReply();
     } catch {
       setError("Błąd połączenia. Spróbuj ponownie.");
     } finally {
-      setSending(false);
+      setDeleting(null);
     }
   }
 
@@ -212,6 +314,132 @@ export default function Comments({
     } finally {
       setPendingVote(null);
     }
+  }
+
+  function renderReplyForm(comment: CommentItem) {
+    if (replyTo !== comment.id) return null;
+    return (
+      <div className="mt-3 rounded-lg border border-ph-border bg-ph-black/60 p-3">
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-ph-muted">
+          <CornerDownRight className="h-3.5 w-3.5 text-ph-orange" />
+          Odpowiadasz na komentarz{" "}
+          <span className="font-semibold text-ph-orange">
+            @{comment.username}
+          </span>
+        </p>
+        <textarea
+          autoFocus
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value.slice(0, MAX_LEN))}
+          placeholder="Napisz odpowiedź…"
+          rows={2}
+          maxLength={MAX_LEN}
+          className="w-full resize-y rounded-md border border-ph-border bg-ph-black px-3 py-2 text-sm text-white placeholder-ph-muted outline-none transition-colors focus:border-ph-orange"
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span
+            className={`text-xs ${
+              replyText.length > MAX_LEN - 100
+                ? "text-ph-orange"
+                : "text-ph-muted"
+            }`}
+          >
+            {replyText.length}/{MAX_LEN}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={closeReply}
+              className="rounded-full px-3 py-1.5 text-xs font-semibold text-ph-muted transition-colors hover:text-white"
+            >
+              Anuluj
+            </button>
+            <button
+              type="button"
+              onClick={() => submitReply(comment)}
+              disabled={replySending || !replyText.trim()}
+              className="flex items-center gap-1.5 rounded-full bg-ph-orange px-4 py-1.5 text-xs font-bold text-black transition-all hover:bg-ph-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {replySending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              Odpowiedz
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderComment(comment: CommentItem, isReply: boolean) {
+    const mine = me === comment.username;
+    return (
+      <div className="flex items-start gap-3">
+        <Avatar username={comment.username} size={isReply ? 32 : 40} />
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="flex items-center gap-1 font-display font-bold text-white">
+              {comment.username}
+              {isVerified(comment.username) && (
+                <VerifiedBadge className="h-4 w-4" />
+              )}
+            </span>
+            {isReply && (
+              <span className="rounded bg-ph-panel px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ph-muted">
+                odpowiedź
+              </span>
+            )}
+            <span className="text-xs text-ph-muted">
+              {timeAgo(new Date(comment.createdAt))}
+            </span>
+            {mine && (
+              <span className="text-[11px] text-ph-orange">• Ty</span>
+            )}
+          </p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ph-text">
+            {comment.body}
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <VoteButtons
+              comment={comment}
+              disabled={pendingVote === comment.id}
+              onVote={(type) => vote(comment, type)}
+            />
+            <button
+              type="button"
+              onClick={() => openReply(comment)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                replyTo === comment.id
+                  ? "bg-ph-orange/15 text-ph-orange"
+                  : "bg-ph-panel text-ph-muted hover:bg-ph-border hover:text-white"
+              }`}
+            >
+              <CornerDownRight className="h-3.5 w-3.5" /> Odpowiedz
+            </button>
+            {mine && (
+              <button
+                type="button"
+                onClick={() => removeComment(comment)}
+                disabled={deleting === comment.id}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-60"
+              >
+                {deleting === comment.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Usuń
+              </button>
+            )}
+          </div>
+
+          {renderReplyForm(comment)}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -294,7 +522,7 @@ export default function Comments({
       )}
 
       {/* Lista komentarzy */}
-      {list.length === 0 ? (
+      {tree.roots.length === 0 ? (
         <div className="mt-6 rounded-lg border border-dashed border-ph-border px-4 py-10 text-center">
           <MessageSquare className="mx-auto h-7 w-7 text-ph-border" />
           <p className="mt-2 font-display font-bold text-white">
@@ -305,33 +533,22 @@ export default function Comments({
           </p>
         </div>
       ) : (
-        <ul className="mt-5 divide-y divide-ph-border">
-          {list.map((c) => (
-            <li key={c.id} className="animate-fade-up flex items-start gap-3 py-4">
-              <Avatar username={c.username} />
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span className="flex items-center gap-1 font-display font-bold text-white">
-                    {c.username}
-                    {isVerified(c.username) && (
-                      <VerifiedBadge className="h-4 w-4" />
-                    )}
-                  </span>
-                  <span className="text-xs text-ph-muted">
-                    {timeAgo(new Date(c.createdAt))}
-                  </span>
-                </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ph-text">
-                  {c.body}
-                </p>
-                <LikeButtons
-                  comment={c}
-                  disabled={pendingVote === c.id}
-                  onVote={(type) => vote(c, type)}
-                />
-              </div>
-            </li>
-          ))}
+        <ul className="mt-5 space-y-5">
+          {tree.roots.map((root) => {
+            const replies = tree.byParent.get(root.id) ?? [];
+            return (
+              <li key={root.id} className="animate-fade-up">
+                {renderComment(root, false)}
+                {replies.length > 0 && (
+                  <ul className="mt-4 space-y-4 border-l-2 border-ph-border pl-3 sm:pl-4">
+                    {replies.map((reply) => (
+                      <li key={reply.id}>{renderComment(reply, true)}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

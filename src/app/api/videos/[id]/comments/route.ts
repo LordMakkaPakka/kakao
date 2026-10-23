@@ -42,7 +42,7 @@ export async function POST(
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { body?: string }
+    | { body?: string; parentId?: number | null }
     | null;
   const text = String(body?.body ?? "").trim().replace(/\s{3,}/g, "\n\n");
 
@@ -70,9 +70,40 @@ export async function POST(
     return NextResponse.json({ error: "Nie ma takiego filmu." }, { status: 404 });
   }
 
+  const requestedParent = body?.parentId;
+  let parentId: number | null = null;
+
+  if (requestedParent !== undefined && requestedParent !== null) {
+    const parentNumber = Number(requestedParent);
+    if (!Number.isInteger(parentNumber) || parentNumber <= 0) {
+      return NextResponse.json(
+        { error: "Nieprawidłowy komentarz nadrzędny." },
+        { status: 400 }
+      );
+    }
+    const [parent] = await db
+      .select({
+        id: comments.id,
+        videoId: comments.videoId,
+        parentId: comments.parentId,
+      })
+      .from(comments)
+      .where(eq(comments.id, parentNumber))
+      .limit(1);
+    if (!parent || parent.videoId !== videoId) {
+      return NextResponse.json(
+        { error: "Nie ma takiego komentarza." },
+        { status: 404 }
+      );
+    }
+    // Odpowiedzi mają maksymalnie jeden poziom – odpowiadając na odpowiedź,
+    // przypinamy nowy wpis do jej komentarza głównego.
+    parentId = parent.parentId ?? parent.id;
+  }
+
   const [created] = await db
     .insert(comments)
-    .values({ videoId, username: user, body: text })
+    .values({ videoId, parentId, username: user, body: text })
     .returning();
 
   return NextResponse.json(
@@ -80,6 +111,7 @@ export async function POST(
       comment: {
         id: created.id,
         videoId: created.videoId,
+        parentId: created.parentId,
         username: created.username,
         body: created.body,
         likes: created.likes,

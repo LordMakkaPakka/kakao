@@ -6,6 +6,8 @@ import { commentVotes, comments } from "@/db/schema";
 export type CommentItem = {
   id: number;
   videoId: number;
+  /** null = komentarz główny, liczba = odpowiedź na ten komentarz. */
+  parentId: number | null;
   username: string;
   body: string;
   likes: number;
@@ -22,7 +24,10 @@ export function voteLabel(value: number | null | undefined): CommentItem["myVote
 
 export const MAX_COMMENT_LENGTH = 1000;
 
-/** Lista komentarzy pod filmem (najnowsze pierwsze) wraz z głosem widza. */
+/**
+ * Lista komentarzy pod filmem (najnowsze pierwsze) wraz z głosem widza.
+ * Odpowiedzi mają ustawione `parentId` – drzewo składamy w komponencie.
+ */
 export async function listComments(
   videoId: number,
   viewer: string | null
@@ -31,6 +36,7 @@ export async function listComments(
     .select({
       id: comments.id,
       videoId: comments.videoId,
+      parentId: comments.parentId,
       username: comments.username,
       body: comments.body,
       likes: comments.likes,

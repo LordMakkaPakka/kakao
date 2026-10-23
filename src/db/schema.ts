@@ -7,6 +7,7 @@ import {
   customType,
   uniqueIndex,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -52,6 +53,10 @@ export const comments = pgTable(
     videoId: integer("video_id")
       .notNull()
       .references(() => videos.id, { onDelete: "cascade" }),
+    /** Komentarz nadrzędny (odpowiedzi); null = komentarz główny. */
+    parentId: integer("parent_id").references((): AnyPgColumn => comments.id, {
+      onDelete: "cascade",
+    }),
     username: text("username").notNull(),
     body: text("body").notNull(),
     likes: integer("likes").notNull().default(0),
