@@ -60,7 +60,7 @@ export type AdminUserRow = {
   avatar: string | null;
 };
 
-/** Lista kont dla panelu weryfikacji (tylko sensei69). */
+/** Lista kont dla panelu weryfikacji (sensei69 i admini). */
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
   await ensureSchema();
   const rows = await db

@@ -32,7 +32,10 @@ export default function Header({
   const [userOpen, setUserOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(user);
   const [verifiedOverride, setVerifiedOverride] = useState<boolean | null>(null);
+  const [adminOverride, setAdminOverride] = useState<boolean | null>(null);
   const currentVerified = verifiedOverride ?? verified;
+  // Panel moderacji widzą sensei69 i mianowani admini.
+  const currentAdmin = adminOverride ?? isSensei(currentUser);
   const [avatarV, setAvatarV] = useState(0);
   const [avatarOk, setAvatarOk] = useState(true);
 
@@ -53,6 +56,7 @@ export default function Header({
       if (!alive || !me.user) return;
       setCurrentUser(me.user);
       setVerifiedOverride(me.verified);
+      setAdminOverride(me.admin || me.sensei);
     });
     return () => {
       alive = false;
@@ -170,7 +174,7 @@ export default function Header({
                   >
                     <Film className="h-4 w-4 text-ph-muted" /> Moje przesyłanie
                   </Link>
-                  {isSensei(currentUser) && (
+                  {currentAdmin && (
                     <Link
                       href="/admin"
                       onClick={() => setUserOpen(false)}

@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
 import { isSensei } from "@/lib/verified";
-import { adminDeleteAccount, adminDeleteComment, adminDeleteVideo } from "@/lib/moderation";
+import {
+  adminDeleteAccount,
+  adminDeleteComment,
+  adminDeleteVideo,
+  isAdmin,
+} from "@/lib/moderation";
 
 /**
- * Usuwanie treści z panelu moderacji – tylko sensei69.
+ * Usuwanie treści z panelu moderacji – sensei69 i admini.
  * type: "video" | "comment" | "account", id (dla konta: nazwa użytkownika).
  */
 export async function DELETE(req: NextRequest) {
   const user = getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
-  if (!isSensei(user)) {
+  if (!(await isAdmin(user))) {
     return NextResponse.json(
-      { error: "Tylko sensei69 może usuwać treści." },
+      { error: "Tylko moderatorzy mogą usuwać treści." },
       { status: 403 }
     );
   }

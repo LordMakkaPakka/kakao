@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
-import {
-  grantVerification,
-  isSensei,
-  revokeVerification,
-} from "@/lib/verification";
+import { isSensei } from "@/lib/verified";
+import { isAdmin } from "@/lib/moderation";
+import { grantVerification, revokeVerification } from "@/lib/verification";
 
-/** Nadanie lub odebranie odznaki weryfikacji – tylko dla sensei69. */
+/** Nadanie lub odebranie odznaki weryfikacji – sensei69 i admini. */
 export async function POST(req: NextRequest) {
   const user = getUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
   }
-  if (!isSensei(user)) {
+  if (!(await isAdmin(user))) {
     return NextResponse.json(
-      { error: "Tylko sensei69 może nadawać weryfikację." },
+      { error: "Tylko moderatorzy mogą zmieniać weryfikację." },
       { status: 403 }
     );
   }
@@ -28,6 +26,13 @@ export async function POST(req: NextRequest) {
 
   if (!username || typeof verified !== "boolean") {
     return NextResponse.json({ error: "Nieprawidłowe dane." }, { status: 400 });
+  }
+
+  if (isSensei(username)) {
+    return NextResponse.json(
+      { error: "Odznaki sensei69 nie można zmieniać." },
+      { status: 400 }
+    );
   }
 
   if (verified) {

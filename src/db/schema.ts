@@ -114,3 +114,15 @@ export const verificationRevocations = pgTable("verification_revocations", {
 
 export type VerificationRevocation =
   typeof verificationRevocations.$inferSelect;
+
+/**
+ * Administratorzy nadani przez sensei69. sensei69 jest adminem zawsze
+ * (nie trzeba wpisu w tej tabeli).
+ */
+export const admins = pgTable("admins", {
+  username: text("username").primaryKey(),
+  grantedBy: text("granted_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Admin = typeof admins.$inferSelect;

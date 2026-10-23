@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { getUserFromRequest, hashPassword } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { isSensei } from "@/lib/verified";
+import { isAdmin } from "@/lib/moderation";
 
 /**
  * Zmiana hasła kontu (moderacja). Hasła w bazie są hashowane (scrypt),
@@ -13,9 +14,9 @@ import { isSensei } from "@/lib/verified";
 export async function POST(req: NextRequest) {
   const user = getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
-  if (!isSensei(user)) {
+  if (!(await isAdmin(user))) {
     return NextResponse.json(
-      { error: "Tylko sensei69 może zmieniać hasła." },
+      { error: "Tylko moderatorzy mogą zmieniać hasła." },
       { status: 403 }
     );
   }
@@ -31,6 +32,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Podaj konto i nowe hasło." },
       { status: 400 }
+    );
+  }
+  if (isSensei(username) && !isSensei(user)) {
+    return NextResponse.json(
+      { error: "Hasło sensei69 może zmienić tylko on sam." },
+      { status: 403 }
     );
   }
   if (password.length < 4) {

@@ -37,6 +37,7 @@ type Account = {
   remainingMs: number;
   passwordFingerprint: string;
   sensei: boolean;
+  admin: boolean;
 };
 
 type AdminVideo = {
@@ -191,11 +192,13 @@ function BanBox({ account, onDone }: { account: Account; onDone: () => void }) {
 export default function AdminPage() {
   const [state, setState] = useState<"loading" | "denied" | "ready">("loading");
   const [me, setMe] = useState<string | null>(null);
+  const [iamSensei, setIamSensei] = useState(false);
   const [tab, setTab] = useState<Tab>("konta");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [videos, setVideos] = useState<AdminVideo[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [activeBans, setActiveBans] = useState(0);
+  const [adminCount, setAdminCount] = useState(0);
   const [query, setQuery] = useState("");
   const [openBan, setOpenBan] = useState<string | null>(null);
   const [openPassword, setOpenPassword] = useState<string | null>(null);
@@ -224,6 +227,7 @@ export default function AdminPage() {
     setVideos(Array.isArray(data.videos) ? data.videos : []);
     setComments(Array.isArray(data.comments) ? data.comments : []);
     setActiveBans(Number(data.activeBans) || 0);
+    setAdminCount(Array.isArray(data.admins) ? data.admins.length : 0);
     setState("ready");
   }, []);
 
@@ -233,7 +237,8 @@ export default function AdminPage() {
       const info = await fetchMeInfo();
       if (!alive) return;
       setMe(info.user);
-      if (!info.user || !info.sensei) {
+      setIamSensei(!!info.sensei);
+      if (!info.user || !info.admin) {
         setState("denied");
         return;
       }
@@ -328,6 +333,37 @@ export default function AdminPage() {
     }
   }
 
+  async function toggleAdmin(account: Account) {
+    setBusy(`admin-${account.username}`);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await authFetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: account.username,
+          admin: !account.admin,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się zmienić uprawnień.");
+        return;
+      }
+      setInfo(
+        account.admin
+          ? `Odebrano uprawnienia admina kontu ${account.username}.`
+          : `Nadano uprawnienia admina kontu ${account.username}.`
+      );
+      await load();
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function savePassword(account: Account) {
     if (newPassword.length < 4) {
       setError("Hasło musi mieć co najmniej 4 znaki.");
@@ -370,12 +406,12 @@ export default function AdminPage() {
       <div className="mx-auto max-w-md px-4 py-24 text-center">
         <Lock className="mx-auto h-10 w-10 text-ph-border" />
         <h1 className="mt-4 font-display text-2xl font-black text-white">
-          Panel tylko dla <span className="text-ph-orange">sensei69</span>
+          Panel tylko dla <span className="text-ph-orange">moderacji</span>
         </h1>
         <p className="mt-2 text-sm text-ph-muted">
           {me
-            ? `Zalogowano jako ${me}. To konto nie ma uprawnień moderacji.`
-            : "Zaloguj się na konto sensei69, aby moderować serwis."}
+            ? `Zalogowano jako ${me}. To konto nie ma uprawnień moderacji — admina nadaje sensei69.`
+            : "Zaloguj się na konto sensei69 albo na konto z uprawnieniami admina."}
         </p>
         <Link
           href={me ? "/" : "/login"}
@@ -406,9 +442,10 @@ export default function AdminPage() {
             </h1>
             <p className="mt-1 text-sm text-ph-muted">
               Bany (sekundy → lata), usuwanie filmów, komentarzy i kont,
-              odbieranie i nadawanie weryfikacji (także SweetieFox) oraz reset
-              haseł. Aktywne bany:{" "}
-              <strong className="text-white">{activeBans}</strong>
+              odbieranie i nadawanie weryfikacji (także SweetieFox i innym
+              adminom) oraz reset haseł. Aktywne bany:{" "}
+              <strong className="text-white">{activeBans}</strong> · Admini:{" "}
+              <strong className="text-white">{adminCount}</strong>
             </p>
           </div>
         </div>
@@ -481,6 +518,11 @@ export default function AdminPage() {
                         {a.verified && <VerifiedBadge className="h-4 w-4" />}
                         {a.sensei && (
                           <span className="rounded bg-ph-orange px-1.5 py-0.5 text-[10px] font-black uppercase text-black">
+                            super admin
+                          </span>
+                        )}
+                        {!a.sensei && a.admin && (
+                          <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-black uppercase text-white">
                             admin
                           </span>
                         )}
@@ -531,6 +573,25 @@ export default function AdminPage() {
                           className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
                         >
                           <KeyRound className="h-3.5 w-3.5" /> Hasło
+                        </button>
+                      )}
+                      {iamSensei && !a.sensei && a.registered && (
+                        <button
+                          type="button"
+                          onClick={() => toggleAdmin(a)}
+                          disabled={busy === `admin-${a.username}`}
+                          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                            a.admin
+                              ? "border-ph-orange bg-ph-orange/15 text-ph-orange hover:bg-ph-orange/25"
+                              : "border-ph-border text-white hover:border-ph-orange hover:text-ph-orange"
+                          }`}
+                        >
+                          {busy === `admin-${a.username}` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          )}
+                          {a.admin ? "Odbierz admina" : "Nadaj admina"}
                         </button>
                       )}
                       {!a.sensei && (

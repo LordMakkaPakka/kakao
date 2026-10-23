@@ -1,13 +1,14 @@
 /**
  * Odznaki weryfikacji.
  *
- * Konto `sensei69` może nadawać i odbierać weryfikację innym kontom
- * (panel: /weryfikacja). Nadane odznaki trzymamy w tabeli `verifications`.
+ * Konto `sensei69` (oraz mianowani przez niego admini) może nadawać i odbierać
+ * weryfikację innym kontom (panel: /admin). Nadane odznaki trzymamy w tabeli
+ * `verifications`, a odebrane – w `verification_revocations`.
  * Poniższa lista to stałe, domyślne odznaki nadane od początku istnienia serwisu.
  */
 export const VERIFIED_USERS = ["Gnam", "AlanDom", "SweetieFox"];
 
-/** Konto z prawem nadawania weryfikacji. */
+/** Konto z pełnymi uprawnieniami (super admin) – nadaje też adminów. */
 export const SENSEI_USERNAME = "sensei69";
 
 export function isVerified(username: string | null | undefined): boolean {
