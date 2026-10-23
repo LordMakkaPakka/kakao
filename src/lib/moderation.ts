@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { desc, eq, isNotNull } from "drizzle-orm";
+import { desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  admins,
   comments,
   users,
   verificationRevocations,
@@ -9,13 +10,87 @@ import {
   videos,
 } from "@/db/schema";
 import { ensureSchema } from "@/lib/dbInit";
-import { VERIFIED_USERS, isSensei, isStaticVerified } from "@/lib/verified";
+import {
+  SENSEI_USERNAME,
+  VERIFIED_USERS,
+  isSensei,
+  isStaticVerified,
+} from "@/lib/verified";
 import { getVerifiedSet } from "@/lib/verification";
 import { durationToMs, formatCountdown } from "@/lib/banTime";
 
 export { BAN_UNITS, durationToMs, formatCountdown } from "@/lib/banTime";
 export type { BanUnit } from "@/lib/banTime";
 export { isSensei };
+
+/** Nazwy (małymi literami) kont z uprawnieniami admina. */
+export async function getAdminSet(): Promise<Set<string>> {
+  await ensureSchema();
+  const rows = await db.select({ username: admins.username }).from(admins);
+  const set = new Set(rows.map((row) => row.username.trim().toLowerCase()));
+  set.add(SENSEI_USERNAME.toLowerCase());
+  return set;
+}
+
+/**
+ * Czy konto ma uprawnienia moderacji? `sensei69` zawsze, pozostali
+ * tylko gdy zostali mianowani adminami.
+ */
+export async function isAdmin(username: string | null | undefined): Promise<boolean> {
+  if (!username) return false;
+  if (isSensei(username)) return true;
+  const set = await getAdminSet();
+  return set.has(username.trim().toLowerCase());
+}
+
+/** Lista adminów (bez sensei69) do panelu. */
+export async function listAdmins(): Promise<
+  { username: string; grantedBy: string | null; createdAt: string }[]
+> {
+  await ensureSchema();
+  const rows = await db
+    .select({
+      username: admins.username,
+      grantedBy: admins.grantedBy,
+      createdAt: admins.createdAt,
+    })
+    .from(admins)
+    .orderBy(desc(admins.createdAt));
+  return rows.map((row) => ({
+    username: row.username,
+    grantedBy: row.grantedBy,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+/** Nadanie uprawnień admina. Zwraca false, gdy konto nie istnieje. */
+export async function grantAdmin(
+  username: string,
+  grantedBy: string
+): Promise<boolean> {
+  await ensureSchema();
+  const name = username.trim();
+  const [target] = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(sql`lower(${users.username}) = ${name.toLowerCase()}`)
+    .limit(1);
+  if (!target) return false;
+  await db
+    .insert(admins)
+    .values({ username: target.username, grantedBy })
+    .onConflictDoNothing();
+  return true;
+}
+
+/** Odebranie uprawnień admina (sensei69 zachowuje je zawsze). */
+export async function revokeAdmin(username: string): Promise<void> {
+  await ensureSchema();
+  const name = username.trim().toLowerCase();
+  await db
+    .delete(admins)
+    .where(sql`lower(${admins.username}) = ${name}`);
+}
 
 export type BanState = {
   banned: boolean;
@@ -115,6 +190,7 @@ export type AdminAccountRow = {
   /** Skrót hasła – hasła są hashowane, nie da się ich odczytać. */
   passwordFingerprint: string;
   sensei: boolean;
+  admin: boolean;
 };
 
 export type AdminVideoRow = {
@@ -156,6 +232,7 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
   const vids = await db.select({ uploader: videos.uploader }).from(videos);
   const cmts = await db.select({ username: comments.username }).from(comments);
   const verifiedSet = await getVerifiedSet();
+  const adminSet = await getAdminSet();
 
   const videoCount = new Map<string, number>();
   for (const v of vids)
@@ -179,6 +256,7 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
       : 0,
     passwordFingerprint: `${row.passwordHash.slice(0, 8)}…${row.passwordHash.slice(-4)}`,
     sensei: isSensei(row.username),
+    admin: adminSet.has(row.username.toLowerCase()),
   }));
 
   // Nazwy z listy startowej (np. SweetieFox, AlanDom), które nie mają konta
@@ -200,6 +278,7 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
       remainingMs: 0,
       passwordFingerprint: "—",
       sensei: false,
+      admin: false,
     });
   }
 
@@ -282,6 +361,7 @@ export async function adminDeleteAccount(username: string): Promise<boolean> {
   await db
     .delete(verificationRevocations)
     .where(eq(verificationRevocations.username, username));
+  await db.delete(admins).where(eq(admins.username, username));
   await db.delete(users).where(eq(users.username, username));
   return true;
 }

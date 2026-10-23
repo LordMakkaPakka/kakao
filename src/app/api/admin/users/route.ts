@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
-import { isSensei, listUsersForAdmin } from "@/lib/verification";
+import { listUsersForAdmin } from "@/lib/verification";
+import { isAdmin } from "@/lib/moderation";
 
 /** Lista kont do panelu weryfikacji – tylko dla sensei69. */
 export async function GET(req: NextRequest) {
@@ -8,9 +9,9 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
   }
-  if (!isSensei(user)) {
+  if (!(await isAdmin(user))) {
     return NextResponse.json(
-      { error: "Tylko sensei69 może nadawać weryfikację." },
+      { error: "Tylko moderatorzy mają dostęp do listy kont." },
       { status: 403 }
     );
   }

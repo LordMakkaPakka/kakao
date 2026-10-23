@@ -5,17 +5,18 @@ import {
   BAN_UNITS,
   banUser,
   durationToMs,
+  isAdmin,
   type BanUnit,
   unbanUser,
 } from "@/lib/moderation";
 
-/** Ban / odbanowanie konta – tylko sensei69. */
+/** Ban / odbanowanie konta – moderatorzy (sensei69 i admins). */
 export async function POST(req: NextRequest) {
   const user = getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
-  if (!isSensei(user)) {
+  if (!(await isAdmin(user))) {
     return NextResponse.json(
-      { error: "Tylko sensei69 może banować konta." },
+      { error: "Tylko moderatorzy mogą banować konta." },
       { status: 403 }
     );
   }
