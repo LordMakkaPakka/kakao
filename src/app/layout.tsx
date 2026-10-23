@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { Archivo, Barlow } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import AgeGate from "@/components/AgeGate";
 import { getSessionUser } from "@/lib/auth";
 
 const archivo = Archivo({
@@ -26,10 +28,12 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const user = await getSessionUser();
+  const ageOk = (await cookies()).get("ph_age_ok")?.value === "1";
 
   return (
     <html lang="pl" className={`${archivo.variable} ${barlow.variable}`}>
       <body className="min-h-screen bg-ph-black text-ph-text antialiased">
+        <AgeGate initialAccepted={ageOk} />
         <Header user={user} />
         <main className="min-h-[70vh]">{children}</main>
         <Footer />

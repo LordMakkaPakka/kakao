@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, ne, sql, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { videos } from "@/db/schema";
+import { users, videos } from "@/db/schema";
+import { isVerified } from "@/lib/verified";
 import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
 import IntroPlayer from "@/components/IntroPlayer";
@@ -43,6 +44,14 @@ export default async function WatchPage({
 
   if (!video) notFound();
 
+  const [uploaderRow] = await db
+    .select({ avatar: users.avatar })
+    .from(users)
+    .where(eq(users.username, video.uploader))
+    .limit(1);
+  const uploaderAvatar = uploaderRow?.avatar ?? null;
+  const verified = isVerified(video.uploader);
+
   const related = await db
     .select({
       id: videos.id,
@@ -78,6 +87,8 @@ export default async function WatchPage({
             <IntroPlayer
               src={`/api/videos/${video.id}/file`}
               poster={video.thumbnail}
+              title={video.title}
+              uploader={video.uploader}
             />
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
@@ -116,15 +127,21 @@ export default async function WatchPage({
             {/* Uploader + description */}
             <div className="mt-5 rounded-xl border border-ph-border bg-ph-dark p-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ph-orange font-display text-lg font-black text-black">
-                  {video.uploader.charAt(0)}
+                <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display text-lg font-black text-black">
+                  {uploaderAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={uploaderAvatar} alt={video.uploader} className="h-full w-full object-cover" />
+                  ) : (
+                    video.uploader.charAt(0)
+                  )}
                 </span>
                 <div>
                   <p className="flex items-center gap-1.5 font-display font-bold text-white">
-                    {video.uploader} <BadgeCheck className="h-4 w-4 text-ph-orange" />
+                    {video.uploader}{" "}
+                    {verified && <BadgeCheck className="h-4 w-4 text-ph-orange" />}
                   </p>
                   <p className="text-xs text-ph-muted">
-                    Zweryfikowany twórca PolHub
+                    {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"}
                   </p>
                 </div>
                 <button className="ml-auto rounded-full bg-ph-orange px-5 py-2 text-sm font-bold text-black transition-all hover:bg-ph-orange-hover">

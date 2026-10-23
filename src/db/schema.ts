@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  avatar: text("avatar"), // data URL (zdjęcie profilowe)
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

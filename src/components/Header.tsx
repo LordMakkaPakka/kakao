@@ -22,6 +22,17 @@ export default function Header({ user }: { user: string | null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(user);
+  const [avatarV, setAvatarV] = useState(0);
+  const [avatarOk, setAvatarOk] = useState(true);
+
+  useEffect(() => {
+    const bump = () => {
+      setAvatarOk(true);
+      setAvatarV((v) => v + 1);
+    };
+    window.addEventListener("polhub-avatar", bump);
+    return () => window.removeEventListener("polhub-avatar", bump);
+  }, []);
 
   // Gdy przeglądarka blokuje ciasteczka (podgląd w iframe),
   // sesję potwierdzamy tokenem z localStorage.
@@ -104,8 +115,18 @@ export default function Header({ user }: { user: string | null }) {
                 className="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-ph-panel"
                 aria-label="Menu konta"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ph-orange font-display text-sm font-black text-black">
-                  {currentUser.charAt(0)}
+                <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display text-sm font-black text-black">
+                  {avatarOk ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/avatar/${encodeURIComponent(currentUser)}?v=${avatarV}`}
+                      alt=""
+                      onError={() => setAvatarOk(false)}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    currentUser.charAt(0)
+                  )}
                 </span>
                 <span className="hidden text-sm font-semibold md:inline">{currentUser}</span>
                 <ChevronDown className="h-4 w-4 text-ph-muted" />
@@ -116,6 +137,13 @@ export default function Header({ user }: { user: string | null }) {
                     <p className="text-xs text-ph-muted">Zalogowano jako</p>
                     <p className="font-display font-bold text-ph-orange">{currentUser}</p>
                   </div>
+                  <Link
+                    href="/account"
+                    onClick={() => setUserOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-ph-dark"
+                  >
+                    <User className="h-4 w-4 text-ph-muted" /> Moje konto
+                  </Link>
                   <Link
                     href="/upload"
                     onClick={() => setUserOpen(false)}

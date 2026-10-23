@@ -83,28 +83,19 @@ body {
 @keyframes intro-logo-pop {
   0% {
     opacity: 0;
-    transform: scale(1.6);
-    filter: blur(8px);
+    transform: scale(0.92);
   }
-  35% {
+  15% {
     opacity: 1;
-    transform: scale(0.96);
-    filter: blur(0);
-  }
-  50% {
-    transform: scale(1.04);
-  }
-  65% {
-    transform: scale(1);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1.08);
   }
 }
 
 .intro-logo {
-  animation: intro-logo-pop 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.3s both;
+  animation: intro-logo-pop 2.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.25s both;
 }
 
 @keyframes intro-sub-in {
@@ -139,4 +130,29 @@ body {
 
 .intro-glow {
   animation: intro-glow-pulse 1.4s ease 0.3s both;
+}
+
+.ph-volume {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: rgb(255 255 255 / 0.25);
+  background-image: linear-gradient(var(--color-ph-orange), var(--color-ph-orange));
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.ph-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+}
+.ph-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
 }

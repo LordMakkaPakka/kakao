@@ -44,7 +44,7 @@ export default function Footer() {
                 {group.items.map((item) => (
                   <li key={item}>
                     <Link
-                      href="/"
+                      href={item === "Regulamin" ? "/regulamin" : "/"}
                       className="text-sm text-ph-muted transition-colors hover:text-white hover:underline"
                     >
                       {item}

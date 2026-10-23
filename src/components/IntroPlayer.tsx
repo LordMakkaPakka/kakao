@@ -1,132 +1,126 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SkipForward, RotateCcw, Volume2 } from "lucide-react";
+import { SkipForward, Volume2, Maximize, Minimize } from "lucide-react";
 
-const INTRO_TOTAL_MS = 3200;
-const INTRO_FADE_MS = 450;
+const INTRO_VIDEO_URL = "/intro.mov";
+const INTRO_FADE_MS = 400;
+const INTRO_MAX_MS = 15000;
 
-/** Syntezowany bęben intro (ba-dum-tss) – generowany, bez zewnętrznych plików. */
-function playIntroDrums(ctx: AudioContext) {
-  const t0 = ctx.currentTime + 0.35;
+const NOW_PLAYING_ARTWORK = "/ph-artwork.jpeg";
 
-  const kick = (time: number) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(150, time);
-    osc.frequency.exponentialRampToValueAtTime(42, time + 0.22);
-    gain.gain.setValueAtTime(0.9, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.32);
-  };
-
-  const tss = (time: number) => {
-    const duration = 0.5;
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 6500;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.35, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-    noise.connect(filter).connect(gain).connect(ctx.destination);
-    noise.start(time);
-    noise.stop(time + duration);
-  };
-
-  kick(t0);
-  kick(t0 + 0.32);
-  tss(t0 + 0.64);
+function setNowPlaying(title: string, artist: string) {
+  if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title,
+    artist,
+    album: "PolHub",
+    artwork: [96, 128, 192, 256, 384, 512].map((size) => ({
+      src: NOW_PLAYING_ARTWORK,
+      sizes: `${size}x${size}`,
+      type: "image/jpeg",
+    })),
+  });
 }
+
+type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
 
 export default function IntroPlayer({
   src,
   poster,
+  title = "PolHub",
+  uploader = "PolHub",
 }: {
   src: string;
   poster?: string | null;
+  title?: string;
+  uploader?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const introRef = useRef<HTMLVideoElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const audioRef = useRef<AudioContext | null>(null);
   const [showIntro, setShowIntro] = useState(true);
   const [fading, setFading] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const clearTimers = () => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   };
 
-  const startVideo = useCallback(() => {
-    clearTimers();
-    setShowIntro(false);
-    setFading(false);
-    const video = videoRef.current;
-    if (video) {
-      video.play().catch(() => {
-        /* przeglądarka blokuje autoplay – użytkownik kliknie play */
-      });
-    }
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const runIntro = useCallback(() => {
-    clearTimers();
-    setShowIntro(true);
-    setFading(false);
-    setStarted(true);
-    videoRef.current?.pause();
-
-    // dźwięk (może wymagać kliknięcia – przeglądarki blokują autoplay audio)
-    try {
-      const Ctx =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctx) {
-        audioRef.current?.close().catch(() => {});
-        const ctx = new Ctx();
-        audioRef.current = ctx;
-        if (ctx.state === "running") {
-          playIntroDrums(ctx);
-        } else {
-          ctx.resume().then(() => playIntroDrums(ctx)).catch(() => {});
-        }
-      }
-    } catch {
-      /* bez dźwięku też jest pięknie */
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+      return;
     }
+    const el = containerRef.current;
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => {
+        (introRef.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
+      });
+    } else {
+      // iPhone: tylko element wideo może przejść na pełny ekran
+      (introRef.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
+    }
+  };
 
-    timersRef.current.push(
-      setTimeout(() => setFading(true), INTRO_TOTAL_MS - INTRO_FADE_MS),
-      setTimeout(() => startVideo(), INTRO_TOTAL_MS)
-    );
+  const startVideo = useCallback(() => {
+    clearTimers();
+    introRef.current?.pause();
+    setShowIntro(false);
+    setFading(false);
+    videoRef.current?.play().catch(() => {
+      /* przeglądarka blokuje autoplay – użytkownik kliknie play */
+    });
+  }, []);
+
+  const finishIntro = useCallback(() => {
+    clearTimers();
+    setFading(true);
+    timersRef.current.push(setTimeout(startVideo, INTRO_FADE_MS));
   }, [startVideo]);
 
-  useEffect(() => {
-    runIntro();
-    return () => {
-      clearTimers();
-      audioRef.current?.close().catch(() => {});
-    };
-  }, [runIntro]);
+  const playIntro = useCallback(() => {
+    const intro = introRef.current;
+    if (!intro) return;
+    intro.currentTime = 0;
+    intro.muted = false;
+    setMuted(false);
+    intro.play().catch(() => {
+      intro.muted = true;
+      setMuted(true);
+      intro.play().catch(finishIntro);
+    });
+  }, [finishIntro]);
 
-  // pierwsze kliknięcie gdziekolwiek w odtwarzacz odblokowuje audio
-  const unlockAudio = () => {
-    const ctx = audioRef.current;
-    if (ctx && ctx.state === "suspended") {
-      ctx.resume().then(() => playIntroDrums(ctx)).catch(() => {});
+  useEffect(() => {
+    videoRef.current?.pause();
+    timersRef.current.push(setTimeout(finishIntro, INTRO_MAX_MS));
+    playIntro();
+    return clearTimers;
+  }, [finishIntro, playIntro]);
+
+  const unmute = () => {
+    const intro = introRef.current;
+    if (intro && intro.muted) {
+      intro.muted = false;
+      setMuted(false);
     }
   };
 
   return (
-    <div className="group/player relative overflow-hidden rounded-xl bg-black ring-1 ring-ph-border">
+    <div
+      ref={containerRef}
+      className="relative overflow-hidden rounded-xl bg-black"
+    >
       <video
         ref={videoRef}
         src={src}
@@ -134,57 +128,58 @@ export default function IntroPlayer({
         controls
         playsInline
         preload="auto"
-        className="aspect-video w-full bg-black"
+        onPlay={() => setNowPlaying(title, uploader)}
+        onLoadedMetadata={() => setNowPlaying(title, uploader)}
+        className="aspect-video h-full w-full bg-black object-contain"
       />
 
-      {/* INTRO OVERLAY */}
       {showIntro && (
         <div
-          onPointerDown={unlockAudio}
-          className={`absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-500 ${
+          onPointerDown={unmute}
+          className={`absolute left-0 top-0 z-10 h-full w-full overflow-hidden bg-black transition-opacity duration-400 ${
             fading ? "opacity-0" : "opacity-100"
           }`}
         >
-          {/* ambient glow */}
-          <div className="intro-glow pointer-events-none absolute left-1/2 top-1/2 h-56 w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ph-orange/15 blur-3xl" />
+          <video
+            ref={introRef}
+            src={INTRO_VIDEO_URL}
+            playsInline
+            preload="auto"
+            onPlay={() => setNowPlaying(title, uploader)}
+            onEnded={finishIntro}
+            onError={finishIntro}
+            className="h-full w-full scale-[1.35] object-cover"
+            aria-label="Intro Polhub"
+          />
 
-          {/* logo */}
-          <div className="intro-logo relative font-display text-5xl font-black tracking-tight sm:text-7xl">
-            <span className="text-white">Pol</span>
-            <span className="ml-2 inline-block rounded-lg bg-ph-orange px-3 py-1 text-black sm:rounded-xl sm:px-4">
-              Hub
-            </span>
-          </div>
-          <p className="intro-sub mt-4 text-xs font-semibold uppercase tracking-[0.4em] text-ph-muted sm:text-sm">
-            przedstawia
-          </p>
-
-          {/* hint gdy audio zablokowane */}
-          {started && (
-            <p className="absolute bottom-4 left-4 flex items-center gap-1.5 text-[11px] text-ph-muted/70">
-              <Volume2 className="h-3.5 w-3.5" /> kliknij, aby włączyć dźwięk intro
+          {muted && (
+            <p className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[11px] text-white/80">
+              <Volume2 className="h-3.5 w-3.5" /> kliknij, aby włączyć dźwięk
             </p>
           )}
 
-          {/* skip */}
-          <button
-            onClick={startVideo}
-            className="absolute bottom-4 right-4 flex items-center gap-2 rounded-md border border-white/25 bg-black/60 px-4 py-2 text-xs font-bold text-white transition-all hover:border-ph-orange hover:bg-ph-orange hover:text-black sm:text-sm"
-          >
-            Pomiń intro <SkipForward className="h-4 w-4" />
-          </button>
+          <div className="absolute bottom-4 right-4 flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFullscreen();
+              }}
+              aria-label={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+              className="flex items-center justify-center rounded-md border border-white/25 bg-black/60 p-2 text-white transition-all hover:border-ph-orange hover:bg-ph-orange hover:text-black"
+            >
+              {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                startVideo();
+              }}
+              className="flex items-center gap-2 rounded-md border border-white/25 bg-black/60 px-4 py-2 text-xs font-bold text-white transition-all hover:border-ph-orange hover:bg-ph-orange hover:text-black sm:text-sm"
+            >
+              Pomiń intro <SkipForward className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-      )}
-
-      {/* replay intro */}
-      {!showIntro && (
-        <button
-          onClick={runIntro}
-          title="Odtwórz intro ponownie"
-          className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-ph-muted opacity-0 transition-all hover:bg-ph-orange hover:text-black group-hover/player:opacity-100"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> Intro
-        </button>
       )}
     </div>
   );

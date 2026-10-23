@@ -39,6 +39,7 @@ export function ensureSchema(): Promise<void> {
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`);
     })().catch((err) => {
       globalInit.__polhubSchemaReady = undefined;
       throw err;
