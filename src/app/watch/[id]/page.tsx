@@ -79,6 +79,7 @@ export default async function WatchPage({
               src={`/api/videos/${video.id}/file`}
               poster={video.thumbnail}
               title={video.title}
+              uploader={video.uploader}
             />
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
