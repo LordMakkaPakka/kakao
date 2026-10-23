@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SkipForward, RotateCcw, Volume2 } from "lucide-react";
+import { SkipForward, Volume2 } from "lucide-react";
+import VideoControls from "@/components/VideoControls";
 
 const INTRO_VIDEO_URL = "/intro.mov";
 const INTRO_FADE_MS = 400;
@@ -34,6 +35,7 @@ export default function IntroPlayer({
   title?: string;
   uploader?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const introRef = useRef<HTMLVideoElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -102,18 +104,24 @@ export default function IntroPlayer({
   };
 
   return (
-    <div className="group/player relative overflow-hidden rounded-xl bg-black ring-1 ring-ph-border">
+    <div
+      ref={containerRef}
+      className="group/player relative overflow-hidden rounded-2xl bg-black shadow-[0_20px_60px_-20px_rgba(255,153,0,0.25)] ring-1 ring-white/10"
+    >
       <video
         ref={videoRef}
         src={src}
         poster={poster ?? undefined}
-        controls
         playsInline
         preload="auto"
         onPlay={() => setNowPlaying(title, uploader)}
         onLoadedMetadata={() => setNowPlaying(title, uploader)}
-        className="aspect-video w-full bg-black"
+        className="aspect-video h-full w-full bg-black object-contain"
       />
+
+      {!showIntro && (
+        <VideoControls videoRef={videoRef} containerRef={containerRef} onReplayIntro={runIntro} />
+      )}
 
       {showIntro && (
         <div
@@ -150,16 +158,6 @@ export default function IntroPlayer({
             Pomiń intro <SkipForward className="h-4 w-4" />
           </button>
         </div>
-      )}
-
-      {!showIntro && (
-        <button
-          onClick={runIntro}
-          title="Odtwórz intro ponownie"
-          className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-ph-muted opacity-0 transition-all hover:bg-ph-orange hover:text-black group-hover/player:opacity-100"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> Intro
-        </button>
       )}
     </div>
   );
