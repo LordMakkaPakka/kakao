@@ -6,6 +6,7 @@ import CategoryBar from "@/components/CategoryBar";
 import VideoCard from "@/components/VideoCard";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
+import { getVerifiedSet } from "@/lib/verification";
 import { UploadCloud, Clapperboard, TvMinimalPlay, Lock, UserPlus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,12 @@ export default async function HomePage({
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(cat === "Popularne" ? desc(videos.views) : desc(videos.createdAt))
     .limit(48);
+
+  const verifiedSet = await getVerifiedSet();
+  const cards = rows.map((v) => ({
+    ...v,
+    uploaderVerified: verifiedSet.has(v.uploader.toLowerCase()),
+  }));
 
   return (
     <>
@@ -85,7 +92,7 @@ export default async function HomePage({
 
         {rows.length > 0 ? (
           <div className="grid grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {rows.map((v, i) => (
+            {cards.map((v, i) => (
               <VideoCard key={v.id} video={v} index={i} />
             ))}
           </div>

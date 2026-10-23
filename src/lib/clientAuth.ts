@@ -45,3 +45,20 @@ export async function fetchMe(): Promise<string | null> {
     return null;
   }
 }
+export type MeInfo = { user: string | null; verified: boolean; sensei: boolean };
+
+/** Sesja + informacje o odznace (działa też bez ciasteczek). */
+export async function fetchMeInfo(): Promise<MeInfo> {
+  try {
+    const res = await authFetch("/api/me", { cache: "no-store" });
+    if (!res.ok) return { user: null, verified: false, sensei: false };
+    const data = await res.json();
+    return {
+      user: typeof data.user === "string" ? data.user : null,
+      verified: data.verified === true,
+      sensei: data.sensei === true,
+    };
+  } catch {
+    return { user: null, verified: false, sensei: false };
+  }
+}

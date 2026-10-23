@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { CHUNK_SIZE, createPendingUpload, MAX_UPLOAD_SIZE } from "@/lib/uploadStore";
+import { bannedResponse } from "@/lib/moderation";
 
 export async function POST(req: NextRequest) {
   await ensureSchema();
@@ -12,6 +13,9 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const body = (await req.json().catch(() => null)) as {
     fileName?: string;

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
+import { bannedResponse } from "@/lib/moderation";
 
 const MAX_LEN = 400_000; // ~300 KB obrazka
 
@@ -11,6 +12,9 @@ const MAX_LEN = 400_000; // ~300 KB obrazka
 export async function POST(req: NextRequest) {
   const user = getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const body = (await req.json().catch(() => null)) as { avatar?: string | null } | null;
   const avatar = body?.avatar ?? null;

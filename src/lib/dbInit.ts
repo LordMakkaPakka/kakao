@@ -40,6 +40,61 @@ export function ensureSchema(): Promise<void> {
         )
       `);
       await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`);
+      await db.execute(
+        sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until TIMESTAMP`
+      );
+      await db.execute(
+        sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT`
+      );
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS comments (
+          id SERIAL PRIMARY KEY,
+          video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+          parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+          username TEXT NOT NULL,
+          body TEXT NOT NULL,
+          likes INTEGER NOT NULL DEFAULT 0,
+          dislikes INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id INTEGER
+          REFERENCES comments(id) ON DELETE CASCADE
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS comments_video_id_idx ON comments (video_id)
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS comments_parent_id_idx ON comments (parent_id)
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS comment_votes (
+          id SERIAL PRIMARY KEY,
+          comment_id INTEGER NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+          username TEXT NOT NULL,
+          value INTEGER NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS comment_votes_comment_user_idx
+          ON comment_votes (comment_id, username)
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS verifications (
+          username TEXT PRIMARY KEY,
+          granted_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS verification_revocations (
+          username TEXT PRIMARY KEY,
+          revoked_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
     })().catch((err) => {
       globalInit.__polhubSchemaReady = undefined;
       throw err;

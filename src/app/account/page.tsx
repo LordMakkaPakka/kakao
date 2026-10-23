@@ -2,10 +2,12 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import { Ban, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { authFetch } from "@/lib/clientAuth";
-import { isVerified } from "@/lib/verified";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
+import { formatCountdown } from "@/lib/banTime";
 
 type MyVideo = {
   id: number;
@@ -41,6 +43,8 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [ban, setBan] = useState<{ reason: string | null; remainingMs: number } | null>(null);
   const [list, setList] = useState<MyVideo[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -54,6 +58,8 @@ export default function AccountPage() {
         const d = await r.json();
         setUser(d.user);
         setAvatar(d.avatar);
+        setVerified(d.verified === true);
+        if (d.banned) setBan({ reason: d.banReason ?? null, remainingMs: Number(d.remainingMs) || 0 });
         setList(d.videos);
       })
       .finally(() => setLoading(false));
@@ -87,7 +93,6 @@ export default function AccountPage() {
   }
 
   async function remove(v: MyVideo) {
-    if (!confirm(`Usunąć film „${v.title}”? Tego nie da się cofnąć.`)) return;
     setDeleting(v.id);
     const r = await authFetch(`/api/videos/${v.id}`, { method: "DELETE" });
     if (r.ok) setList((l) => l.filter((x) => x.id !== v.id));
@@ -119,6 +124,17 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      {ban && (
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <Ban className="h-4 w-4 shrink-0" />
+          <span>
+            Konto jest zbanowane. Pozostało{" "}
+            <strong>{formatCountdown(ban.remainingMs)}</strong>
+            {ban.reason ? ` · powód: ${ban.reason}` : ""}. W tym czasie nie
+            możesz komentować, oceniać ani wrzucać filmów.
+          </span>
+        </div>
+      )}
       <div className="flex flex-col items-center gap-5 rounded-xl border border-ph-border bg-ph-dark p-6 sm:flex-row">
         <button
           onClick={() => fileRef.current?.click()}
@@ -142,10 +158,10 @@ export default function AccountPage() {
         <div className="text-center sm:text-left">
           <h1 className="flex items-center justify-center gap-2 font-display text-2xl font-extrabold text-white sm:justify-start">
             {user}
-            {isVerified(user) && <BadgeCheck className="h-6 w-6 text-ph-orange" aria-label="Zweryfikowany" />}
+            {verified && <VerifiedBadge className="h-6 w-6" />}
           </h1>
           <p className="text-sm text-ph-muted">
-            {isVerified(user) ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"} · {list.length} filmów
+            {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"} · {list.length} filmów
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             <button
@@ -203,15 +219,14 @@ export default function AccountPage() {
                   </p>
                 </div>
               </Link>
-              <button
-                onClick={() => remove(v)}
-                disabled={deleting === v.id}
-                aria-label={`Usuń ${v.title}`}
-                className="flex shrink-0 items-center gap-1.5 rounded-md border border-ph-border px-3 py-2 text-xs font-semibold text-red-400 hover:border-red-400 hover:bg-red-500/10"
-              >
-                {deleting === v.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                <span className="hidden sm:inline">Usuń</span>
-              </button>
+              <ConfirmDeleteButton
+                label="Usuń"
+                question={`Usunąć film „${v.title}”?`}
+                hint="Tego nie da się cofnąć."
+                busy={deleting === v.id}
+                triggerClassName="flex shrink-0 items-center gap-1.5 rounded-md border border-ph-border px-3 py-2 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
+                onConfirm={() => remove(v)}
+              />
             </li>
           ))}
         </ul>

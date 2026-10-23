@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
+import { bannedResponse } from "@/lib/moderation";
 
 const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
 
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
   await ensureSchema();
 
   const form = await req.formData().catch(() => null);

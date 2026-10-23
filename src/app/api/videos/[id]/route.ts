@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
+import { bannedResponse } from "@/lib/moderation";
 
 /** Usuń własny film. */
 export async function DELETE(
@@ -11,6 +12,9 @@ export async function DELETE(
 ) {
   const user = getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Zaloguj się." }, { status: 401 });
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
+
   const { id } = await ctx.params;
   const videoId = Number(id);
   if (!Number.isInteger(videoId)) {

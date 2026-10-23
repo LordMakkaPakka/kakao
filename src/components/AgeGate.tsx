@@ -1,33 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
-import { NOTICES, TERMS, type Section } from "@/lib/terms";
 
 const COOKIE = "ph_age_ok";
 const EXIT_URL = "https://www.google.com";
 
-function Sections({ sections }: { sections: Section[] }) {
-  return (
-    <div className="space-y-5">
-      {sections.map((s) => (
-        <section key={s.title}>
-          <h3 className="font-display text-sm font-bold text-white">{s.title}</h3>
-          <div className="mt-1.5 space-y-1.5">
-            {s.paragraphs.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-export default function AgeGate({ initialAccepted }: { initialAccepted: boolean }) {
+export default function AgeGate({
+  initialAccepted,
+}: {
+  initialAccepted: boolean;
+}) {
   const [accepted, setAccepted] = useState(initialAccepted);
-  const [showTerms, setShowTerms] = useState(false);
   const pathname = usePathname();
   const active = !accepted && pathname !== "/regulamin";
 
@@ -39,15 +24,6 @@ export default function AgeGate({ initialAccepted }: { initialAccepted: boolean 
       document.body.style.overflow = prev;
     };
   }, [active]);
-
-  useEffect(() => {
-    if (!showTerms) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowTerms(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showTerms]);
 
   if (!active) return null;
 
@@ -67,95 +43,60 @@ export default function AgeGate({ initialAccepted }: { initialAccepted: boolean 
       aria-label="Weryfikacja wieku"
       className="fixed inset-0 z-[100] overflow-y-auto bg-black"
     >
-      <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center px-4 py-8 sm:py-12">
-        <p className="font-display text-4xl font-black">
-          <span className="text-white">Pol</span>
-          <span className="ml-1 rounded-md bg-ph-orange px-2 py-0.5 text-black">Hub</span>
-        </p>
-        <p className="mt-4 rounded-md border border-ph-orange px-3 py-1 font-display text-sm font-black uppercase tracking-widest text-ph-orange">
-          Tylko dla osób pełnoletnich · 18+
-        </p>
+      <div className="flex min-h-full items-center justify-center px-3 py-8 sm:px-4">
+        {/* Czarny prostokąt – bramka jak na prawdziwym PH */}
+        <div className="w-full max-w-2xl rounded-xl border border-[#232323] bg-[#0d0d0d] px-5 py-9 text-center shadow-[0_24px_70px_rgba(0,0,0,0.9)] sm:px-10 sm:py-11">
+          <p className="font-display text-4xl font-black tracking-tight sm:text-5xl">
+            <span className="text-white">Pol</span>
+            <span className="ml-1 rounded-md bg-ph-orange px-2 py-0.5 text-black">
+              Hub
+            </span>
+          </p>
 
-        {/* Regulamin – góra */}
-        <h2 className="mt-8 self-start font-display text-lg font-extrabold text-white">
-          Regulamin serwisu
-        </h2>
-        <div className="mt-2 h-72 w-full overflow-y-auto rounded-xl border border-ph-border bg-ph-dark p-4 text-xs leading-relaxed text-ph-muted sm:h-80 sm:text-sm">
-          <Sections sections={TERMS} />
-        </div>
+          <h1 className="mt-7 font-display text-2xl font-extrabold text-white sm:text-4xl">
+            Weryfikacja wieku
+          </h1>
 
-        {/* Przyciski – środek */}
-        <div className="my-8 flex w-full flex-col items-stretch gap-3 sm:flex-row">
-          <button
-            onClick={enter}
-            className="flex-1 rounded-full bg-ph-orange px-6 py-4 font-display text-sm font-black uppercase tracking-wide text-black transition-all hover:bg-ph-orange-hover hover:shadow-[0_0_24px_rgba(255,144,0,0.45)]"
-          >
-            Yes, I’m 18 or older - enter
-          </button>
-          <button
-            onClick={exit}
-            className="flex-1 rounded-full border border-ph-border px-6 py-4 font-display text-sm font-bold uppercase tracking-wide text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
-          >
-            No, I’m under 18 - exit
-          </button>
-        </div>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-ph-text sm:text-[15px]">
+            Ta strona zawiera materiały przeznaczone wyłącznie dla osób
+            dorosłych, w tym nagość oraz jawne sceny seksualne. Wchodząc,
+            potwierdzasz, że masz ukończone 18 lat (lub osiągnąłeś wiek
+            pełnoletności w miejscu, z którego korzystasz z serwisu) i wyrażasz
+            zgodę na oglądanie treści o charakterze seksualnym. Wchodząc na tą
+            stronę akceptujesz{" "}
+            <Link
+              href="/regulamin"
+              className="font-semibold text-ph-orange underline underline-offset-2 transition-colors hover:text-ph-orange-hover"
+            >
+              regulamin
+            </Link>
+            .
+          </p>
 
-        {/* Dodatkowe informacje – dół */}
-        <h2 className="self-start font-display text-lg font-extrabold text-white">
-          Ostrzeżenia i informacje dodatkowe
-        </h2>
-        <div className="mt-2 h-60 w-full overflow-y-auto rounded-xl border border-ph-border bg-ph-dark p-4 text-xs leading-relaxed text-ph-muted sm:text-sm">
-          <Sections sections={NOTICES} />
-        </div>
-
-        <p className="mt-8 text-center text-sm text-ph-muted">
-          Wchodząc na stronę akceptujesz{" "}
-          <button
-            onClick={() => setShowTerms(true)}
-            className="font-semibold text-ph-orange underline underline-offset-2 hover:text-ph-orange-hover"
-          >
-            regulamin
-          </button>
-          .
-        </p>
-      </div>
-
-      {showTerms && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setShowTerms(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Regulamin"
-            onClick={(e) => e.stopPropagation()}
-            className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ph-border bg-ph-dark"
-          >
-            <div className="flex items-center justify-between border-b border-ph-border px-5 py-4">
-              <h2 className="font-display text-xl font-black text-white">Regulamin</h2>
-              <button
-                onClick={() => setShowTerms(false)}
-                aria-label="Zamknij regulamin"
-                className="rounded-md p-1 text-ph-muted transition-colors hover:text-ph-orange"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="overflow-y-auto px-5 py-4 text-sm leading-relaxed text-ph-muted">
-              <Sections sections={TERMS} />
-            </div>
-            <div className="border-t border-ph-border px-5 py-3 text-right">
-              <button
-                onClick={() => setShowTerms(false)}
-                className="rounded-full bg-ph-orange px-5 py-2 text-sm font-black text-black hover:bg-ph-orange-hover"
-              >
-                Zamknij
-              </button>
-            </div>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={enter}
+              className="flex-1 rounded-md bg-ph-orange px-6 py-4 font-display text-sm font-black uppercase tracking-wide text-black transition-colors hover:bg-ph-orange-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              Yes, I’m 18 or older - enter
+            </button>
+            <button
+              onClick={exit}
+              className="flex-1 rounded-md bg-[#2b2b2b] px-6 py-4 font-display text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#3a3a3a] focus:outline-none focus-visible:ring-2 focus-visible:ring-ph-orange focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              No, I’m under 18 - exit
+            </button>
           </div>
+
+          <p className="mt-7 text-sm leading-relaxed text-ph-muted">
+            Nasza{" "}
+            <span className="text-ph-orange">
+              strona kontroli rodzicielskiej
+            </span>{" "}
+            wyjaśnia, jak łatwo zablokować dostęp do tej strony.
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }

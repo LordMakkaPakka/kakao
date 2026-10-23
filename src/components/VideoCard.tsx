@@ -1,18 +1,20 @@
 import Link from "next/link";
-import { Eye, ThumbsUp, Play, BadgeCheck, Film } from "lucide-react";
+import { Eye, ThumbsUp, Play, Film } from "lucide-react";
 import {
   formatDuration,
   formatViews,
   ratingPercent,
   timeAgo,
 } from "@/lib/format";
-import { isVerified } from "@/lib/verified";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export type VideoCardData = {
   id: number;
   title: string;
   category: string;
   uploader: string;
+  /** Czy uploader ma odznakę weryfikacji (liczone na serwerze). */
+  uploaderVerified?: boolean;
   durationSeconds: number;
   thumbnail: string | null;
   views: number;
@@ -62,9 +64,6 @@ export default function VideoCard({
         <span className="absolute bottom-1.5 right-1.5 rounded bg-black/85 px-1.5 py-0.5 font-display text-xs font-bold text-white">
           {formatDuration(video.durationSeconds)}
         </span>
-        <span className="absolute bottom-1.5 left-1.5 rounded bg-ph-orange px-1.5 py-0.5 font-display text-[10px] font-black text-black">
-          HD
-        </span>
         <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-ph-muted">
           {video.category}
         </span>
@@ -77,7 +76,9 @@ export default function VideoCard({
         </h3>
         <p className="mt-1 flex items-center gap-1 text-xs text-ph-muted">
           {video.uploader}
-          {isVerified(video.uploader) && <BadgeCheck className="h-3.5 w-3.5 text-ph-orange" />}
+          {video.uploaderVerified === true && (
+            <VerifiedBadge className="h-3.5 w-3.5" />
+          )}
         </p>
         <div className="mt-1 flex items-center gap-3 text-xs text-ph-muted">
           <span className="flex items-center gap-1">

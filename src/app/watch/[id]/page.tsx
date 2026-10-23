@@ -3,14 +3,18 @@ import { notFound } from "next/navigation";
 import { eq, ne, sql, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { users, videos } from "@/db/schema";
-import { isVerified } from "@/lib/verified";
+import { getVerifiedSet } from "@/lib/verification";
 import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
 import IntroPlayer from "@/components/IntroPlayer";
 import CategoryBar from "@/components/CategoryBar";
+import Comments from "@/components/Comments";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
 import { ensureSchema } from "@/lib/dbInit";
-import { Eye, BadgeCheck, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
+import { getSessionUser } from "@/lib/auth";
+import { listComments } from "@/lib/comments";
+import { Eye, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +54,11 @@ export default async function WatchPage({
     .where(eq(users.username, video.uploader))
     .limit(1);
   const uploaderAvatar = uploaderRow?.avatar ?? null;
-  const verified = isVerified(video.uploader);
+  const verifiedSet = await getVerifiedSet();
+  const verified = verifiedSet.has(video.uploader.toLowerCase());
+
+  const viewer = await getSessionUser();
+  const initialComments = await listComments(videoId, viewer);
 
   const related = await db
     .select({
@@ -69,6 +77,11 @@ export default async function WatchPage({
     .where(ne(videos.id, videoId))
     .orderBy(desc(videos.createdAt))
     .limit(8);
+
+  const relatedCards = related.map((v) => ({
+    ...v,
+    uploaderVerified: verifiedSet.has(v.uploader.toLowerCase()),
+  }));
 
   return (
     <>
@@ -92,7 +105,7 @@ export default async function WatchPage({
             />
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
-              Intro PolHub dodawane automatycznie do każdego filmu
+              Intro PolHub jest częścią każdego filmu — dodawane automatycznie na początku
             </p>
 
             <h1 className="mt-4 font-display text-xl font-extrabold leading-snug text-white sm:text-2xl">
@@ -138,7 +151,7 @@ export default async function WatchPage({
                 <div>
                   <p className="flex items-center gap-1.5 font-display font-bold text-white">
                     {video.uploader}{" "}
-                    {verified && <BadgeCheck className="h-4 w-4 text-ph-orange" />}
+                    {verified && <VerifiedBadge className="h-4 w-4" />}
                   </p>
                   <p className="text-xs text-ph-muted">
                     {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"}
@@ -154,6 +167,12 @@ export default async function WatchPage({
                 </p>
               )}
             </div>
+
+            <Comments
+              videoId={video.id}
+              initialComments={initialComments}
+              me={viewer}
+            />
           </div>
 
           {/* Related */}
@@ -163,7 +182,7 @@ export default async function WatchPage({
             </h2>
             {related.length > 0 ? (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
-                {related.map((v, i) => (
+                {relatedCards.map((v, i) => (
                   <VideoCard key={v.id} video={v} index={i} />
                 ))}
               </div>

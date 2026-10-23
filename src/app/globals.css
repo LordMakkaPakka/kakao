@@ -156,3 +156,14 @@ body {
   border-radius: 9999px;
   background: #fff;
 }
+
+/* ===== Odtwarzacz PH ===== */
+.ph-player:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.ph-player:fullscreen video {
+  object-fit: contain;
+}

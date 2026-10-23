@@ -1,6 +1,6 @@
 export type Section = { title: string; paragraphs: string[] };
 
-/** Pełny regulamin serwisu. Używany w bramce 18+ oraz na stronie /regulamin. */
+/** Pełny regulamin serwisu. Wyświetlany na stronie /regulamin (drobny maczek). */
 export const TERMS: Section[] = [
   {
     title: "§1. Postanowienia ogólne",
@@ -141,7 +141,7 @@ export const TERMS: Section[] = [
   },
 ];
 
-/** Dodatkowe informacje i ostrzeżenia – pokazywane pod przyciskami na stronie wejściowej. */
+/** Dodatkowe informacje i ostrzeżenia – pokazywane na końcu strony /regulamin. */
 export const NOTICES: Section[] = [
   {
     title: "Ostrzeżenie o treściach dla dorosłych",

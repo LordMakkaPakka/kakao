@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { users, videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
+import { isVerifiedAccount } from "@/lib/verification";
+import { getBanState } from "@/lib/moderation";
 
 /** Dane konta: zdjęcie profilowe + własne filmy. */
 export async function GET(req: NextRequest) {
@@ -29,5 +31,15 @@ export async function GET(req: NextRequest) {
     .where(eq(videos.uploader, user))
     .orderBy(desc(videos.createdAt));
 
-  return NextResponse.json({ user, avatar: me?.avatar ?? null, videos: list });
+  const ban = await getBanState(user);
+
+  return NextResponse.json({
+    user,
+    avatar: me?.avatar ?? null,
+    verified: await isVerifiedAccount(user),
+    banned: ban.banned,
+    banReason: ban.reason,
+    remainingMs: ban.remainingMs,
+    videos: list,
+  });
 }
