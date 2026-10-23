@@ -7,12 +7,30 @@ const INTRO_VIDEO_URL = "/intro.mov";
 const INTRO_FADE_MS = 400;
 const INTRO_MAX_MS = 15000;
 
+const NOW_PLAYING_ARTWORK = "/ph-artwork.jpeg";
+
+function setNowPlaying(title: string) {
+  if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title,
+    artist: "PolHub",
+    album: "PolHub",
+    artwork: [96, 128, 192, 256, 384, 512].map((size) => ({
+      src: NOW_PLAYING_ARTWORK,
+      sizes: `${size}x${size}`,
+      type: "image/jpeg",
+    })),
+  });
+}
+
 export default function IntroPlayer({
   src,
   poster,
+  title = "PolHub",
 }: {
   src: string;
   poster?: string | null;
+  title?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const introRef = useRef<HTMLVideoElement>(null);
@@ -90,6 +108,8 @@ export default function IntroPlayer({
         controls
         playsInline
         preload="auto"
+        onPlay={() => setNowPlaying(title)}
+        onLoadedMetadata={() => setNowPlaying(title)}
         className="aspect-video w-full bg-black"
       />
 
@@ -105,6 +125,7 @@ export default function IntroPlayer({
             src={INTRO_VIDEO_URL}
             playsInline
             preload="auto"
+            onPlay={() => setNowPlaying(title)}
             onEnded={finishIntro}
             onError={finishIntro}
             className="h-full w-full scale-[1.35] object-cover"
