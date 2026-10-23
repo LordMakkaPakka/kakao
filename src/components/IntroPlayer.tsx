@@ -106,8 +106,14 @@ export default function IntroPlayer({
   return (
     <div
       ref={containerRef}
-      className="group/player relative overflow-hidden rounded-2xl bg-black shadow-[0_20px_60px_-20px_rgba(255,153,0,0.25)] ring-1 ring-white/10"
+      className="relative overflow-hidden rounded-xl bg-black"
     >
+      <VideoControls
+        videoRef={videoRef}
+        containerRef={containerRef}
+        onReplayIntro={runIntro}
+        disabled={showIntro}
+      >
       <video
         ref={videoRef}
         src={src}
@@ -119,14 +125,10 @@ export default function IntroPlayer({
         className="aspect-video h-full w-full bg-black object-contain"
       />
 
-      {!showIntro && (
-        <VideoControls videoRef={videoRef} containerRef={containerRef} onReplayIntro={runIntro} />
-      )}
-
       {showIntro && (
         <div
           onPointerDown={unmute}
-          className={`absolute inset-0 z-10 bg-black transition-opacity duration-400 ${
+          className={`absolute left-0 top-0 z-10 h-full w-full overflow-hidden bg-black transition-opacity duration-400 ${
             fading ? "opacity-0" : "opacity-100"
           }`}
         >
@@ -159,6 +161,7 @@ export default function IntroPlayer({
           </button>
         </div>
       )}
+      </VideoControls>
     </div>
   );
 }
