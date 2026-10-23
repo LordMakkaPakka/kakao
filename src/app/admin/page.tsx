@@ -14,13 +14,13 @@ import {
   MessageSquare,
   Search,
   ShieldCheck,
-  Trash2,
   Unlock,
   UserRoundX,
   Users,
 } from "lucide-react";
 import { authFetch, fetchMeInfo } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { timeAgo } from "@/lib/format";
 import { formatCountdown, BAN_UNITS, type BanUnit } from "@/lib/banTime";
 
@@ -271,11 +271,6 @@ export default function AdminPage() {
   }, [comments, query]);
 
   async function deleteContent(type: "video" | "comment" | "account", id: string | number, label: string) {
-    const question =
-      type === "account"
-        ? `Usunąć konto ${label} razem z jego filmami i komentarzami?`
-        : `Usunąć ${type === "video" ? "film" : "komentarz"} „${label}”?`;
-    if (!confirm(`${question} Tego nie da się cofnąć.`)) return;
     setBusy(`${type}-${id}`);
     setError(null);
     setInfo(null);
@@ -559,19 +554,16 @@ export default function AdminPage() {
                             <Ban className="h-3.5 w-3.5" />
                             {banned ? "Zarządzaj banem" : "Banuj"}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteContent("account", a.username, a.username)}
-                            disabled={busy === `account-${a.username}`}
-                            className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
-                          >
-                            {busy === `account-${a.username}` ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <UserRoundX className="h-3.5 w-3.5" />
-                            )}
-                            Usuń konto
-                          </button>
+                          <ConfirmDeleteButton
+                            label="Usuń konto"
+                            question={`Usunąć konto ${a.username}?`}
+                            hint="Znikną też jego filmy i komentarze. Tego nie da się cofnąć."
+                            icon={<UserRoundX className="h-3.5 w-3.5" />}
+                            busy={busy === `account-${a.username}`}
+                            onConfirm={() =>
+                              deleteContent("account", a.username, a.username)
+                            }
+                          />
                         </>
                       )}
                     </div>
@@ -639,19 +631,13 @@ export default function AdminPage() {
                     <span>{timeAgo(new Date(v.createdAt))}</span>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteContent("video", v.id, v.title)}
-                  disabled={busy === `video-${v.id}`}
-                  className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
-                >
-                  {busy === `video-${v.id}` ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
-                  )}
-                  Usuń film
-                </button>
+                <ConfirmDeleteButton
+                  label="Usuń film"
+                  question={`Usunąć film „${v.title}”?`}
+                  hint="Tego nie da się cofnąć."
+                  busy={busy === `video-${v.id}`}
+                  onConfirm={() => deleteContent("video", v.id, v.title)}
+                />
               </li>
             ))}
           </ul>
@@ -686,19 +672,19 @@ export default function AdminPage() {
                       {c.body}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteContent("comment", c.id, c.body.slice(0, 40))}
-                    disabled={busy === `comment-${c.id}`}
-                    className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
-                  >
-                    {busy === `comment-${c.id}` ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Usuń
-                  </button>
+                  <ConfirmDeleteButton
+                    label="Usuń"
+                    question="Usunąć ten komentarz?"
+                    hint={
+                      c.parentId === null
+                        ? "Znikną też odpowiedzi. Tego nie da się cofnąć."
+                        : "Tego nie da się cofnąć."
+                    }
+                    busy={busy === `comment-${c.id}`}
+                    onConfirm={() =>
+                      deleteContent("comment", c.id, c.body.slice(0, 40))
+                    }
+                  />
                 </div>
               </li>
             ))}

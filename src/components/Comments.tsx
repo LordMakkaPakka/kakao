@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { authFetch, fetchMe, getToken } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { timeAgo } from "@/lib/format";
 import type { CommentItem } from "@/lib/comments";
 
@@ -246,12 +247,6 @@ export default function Comments({
 
   async function removeComment(comment: CommentItem) {
     if (deleting !== null) return;
-    const question =
-      comment.parentId === null
-        ? "Usunąć ten komentarz razem z odpowiedziami? Tego nie da się cofnąć."
-        : "Usunąć tę odpowiedź? Tego nie da się cofnąć.";
-    if (!confirm(question)) return;
-
     setDeleting(comment.id);
     setError(null);
     try {
@@ -424,19 +419,23 @@ export default function Comments({
               <CornerDownRight className="h-3.5 w-3.5" /> Odpowiedz
             </button>
             {mine && (
-              <button
-                type="button"
-                onClick={() => removeComment(comment)}
-                disabled={deleting === comment.id}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-60"
-              >
-                {deleting === comment.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-                Usuń
-              </button>
+              <ConfirmDeleteButton
+                label="Usuń"
+                question={
+                  comment.parentId === null
+                    ? "Usunąć ten komentarz?"
+                    : "Usunąć tę odpowiedź?"
+                }
+                hint={
+                  comment.parentId === null
+                    ? "Znikną też odpowiedzi. Tego nie da się cofnąć."
+                    : "Tego nie da się cofnąć."
+                }
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                busy={deleting === comment.id}
+                triggerClassName="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-60"
+                onConfirm={() => removeComment(comment)}
+              />
             )}
           </div>
 

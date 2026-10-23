@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Ban, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { authFetch } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
@@ -92,7 +93,6 @@ export default function AccountPage() {
   }
 
   async function remove(v: MyVideo) {
-    if (!confirm(`Usunąć film „${v.title}”? Tego nie da się cofnąć.`)) return;
     setDeleting(v.id);
     const r = await authFetch(`/api/videos/${v.id}`, { method: "DELETE" });
     if (r.ok) setList((l) => l.filter((x) => x.id !== v.id));
@@ -219,15 +219,14 @@ export default function AccountPage() {
                   </p>
                 </div>
               </Link>
-              <button
-                onClick={() => remove(v)}
-                disabled={deleting === v.id}
-                aria-label={`Usuń ${v.title}`}
-                className="flex shrink-0 items-center gap-1.5 rounded-md border border-ph-border px-3 py-2 text-xs font-semibold text-red-400 hover:border-red-400 hover:bg-red-500/10"
-              >
-                {deleting === v.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                <span className="hidden sm:inline">Usuń</span>
-              </button>
+              <ConfirmDeleteButton
+                label="Usuń"
+                question={`Usunąć film „${v.title}”?`}
+                hint="Tego nie da się cofnąć."
+                busy={deleting === v.id}
+                triggerClassName="flex shrink-0 items-center gap-1.5 rounded-md border border-ph-border px-3 py-2 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
+                onConfirm={() => remove(v)}
+              />
             </li>
           ))}
         </ul>
