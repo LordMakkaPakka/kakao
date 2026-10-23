@@ -101,3 +101,16 @@ export const verifications = pgTable("verifications", {
 });
 
 export type Verification = typeof verifications.$inferSelect;
+
+/**
+ * Odebrane odznaki. Wpis blokuje odznakę z listy startowej (np. SweetieFox)
+ * oraz cofa odznakę nadaną ręcznie; sensei69 może ją później przywrócić.
+ */
+export const verificationRevocations = pgTable("verification_revocations", {
+  username: text("username").primaryKey(),
+  revokedBy: text("revoked_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type VerificationRevocation =
+  typeof verificationRevocations.$inferSelect;

@@ -3,7 +3,6 @@ import { getUserFromRequest } from "@/lib/auth";
 import {
   grantVerification,
   isSensei,
-  isStaticVerified,
   revokeVerification,
 } from "@/lib/verification";
 
@@ -31,13 +30,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nieprawidłowe dane." }, { status: 400 });
   }
 
-  if (!verified && isStaticVerified(username)) {
-    return NextResponse.json(
-      { error: "Tej odznaki nie można odebrać – jest nadana na stałe." },
-      { status: 400 }
-    );
-  }
-
   if (verified) {
     const ok = await grantVerification(username, user);
     if (!ok) {
@@ -47,7 +39,8 @@ export async function POST(req: NextRequest) {
       );
     }
   } else {
-    await revokeVerification(username);
+    // sensei69 może odebrać odznakę każdemu – także SweetieFox.
+    await revokeVerification(username, user);
   }
 
   return NextResponse.json({ ok: true, username, verified });

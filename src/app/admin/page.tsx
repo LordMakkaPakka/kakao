@@ -28,6 +28,7 @@ type Account = {
   username: string;
   verified: boolean;
   staticVerified: boolean;
+  registered: boolean;
   createdAt: string;
   videos: number;
   comments: number;
@@ -410,7 +411,8 @@ export default function AdminPage() {
             </h1>
             <p className="mt-1 text-sm text-ph-muted">
               Bany (sekundy → lata), usuwanie filmów, komentarzy i kont,
-              weryfikacja oraz reset haseł. Aktywne bany:{" "}
+              odbieranie i nadawanie weryfikacji (także SweetieFox) oraz reset
+              haseł. Aktywne bany:{" "}
               <strong className="text-white">{activeBans}</strong>
             </p>
           </div>
@@ -494,28 +496,49 @@ export default function AdminPage() {
                         )}
                       </p>
                       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ph-muted">
-                        <span>konto od {timeAgo(new Date(a.createdAt))}</span>
+                        {a.registered ? (
+                          <span>konto od {timeAgo(new Date(a.createdAt))}</span>
+                        ) : (
+                          <span className="text-ph-border">
+                            konto z listy startowej — bez rejestracji
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
                           <Film className="h-3 w-3" /> {a.videos}
                         </span>
                         <span className="flex items-center gap-1">
                           <MessageSquare className="h-3 w-3" /> {a.comments}
                         </span>
-                        <span className="flex items-center gap-1 font-mono text-[11px] text-ph-border">
-                          <KeyRound className="h-3 w-3" /> hasło: {a.passwordFingerprint}
-                        </span>
+                        {a.registered && (
+                          <span className="flex items-center gap-1 font-mono text-[11px] text-ph-border">
+                            <KeyRound className="h-3 w-3" /> hasło: {a.passwordFingerprint}
+                          </span>
+                        )}
+                        {a.staticVerified && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                              a.verified
+                                ? "bg-[#1d9bf0]/20 text-[#69c0f5]"
+                                : "bg-ph-panel text-ph-muted"
+                            }`}
+                          >
+                            lista startowa
+                          </span>
+                        )}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setOpenPassword(openPassword === a.username ? null : a.username)}
-                        className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
-                      >
-                        <KeyRound className="h-3.5 w-3.5" /> Hasło
-                      </button>
-                      {!a.staticVerified && !a.sensei && (
+                      {a.registered && (
+                        <button
+                          type="button"
+                          onClick={() => setOpenPassword(openPassword === a.username ? null : a.username)}
+                          className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" /> Hasło
+                        </button>
+                      )}
+                      {!a.sensei && (
                         <button
                           type="button"
                           onClick={() => toggleVerified(a)}
@@ -523,10 +546,10 @@ export default function AdminPage() {
                           className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-[#1d9bf0] hover:text-[#4db5f5] disabled:opacity-60"
                         >
                           <BadgeCheck className="h-3.5 w-3.5" />
-                          {a.verified ? "Odbierz odznakę" : "Nadaj odznakę"}
+                          {a.verified ? "Odbierz weryfikację" : "Nadaj weryfikację"}
                         </button>
                       )}
-                      {!a.sensei && (
+                      {!a.sensei && a.registered && (
                         <>
                           <button
                             type="button"

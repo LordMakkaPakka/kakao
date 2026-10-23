@@ -6,7 +6,6 @@ import {
   ratingPercent,
   timeAgo,
 } from "@/lib/format";
-import { isVerified } from "@/lib/verified";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
 export type VideoCardData = {
@@ -77,7 +76,7 @@ export default function VideoCard({
         </h3>
         <p className="mt-1 flex items-center gap-1 text-xs text-ph-muted">
           {video.uploader}
-          {(video.uploaderVerified ?? isVerified(video.uploader)) && (
+          {video.uploaderVerified === true && (
             <VerifiedBadge className="h-3.5 w-3.5" />
           )}
         </p>

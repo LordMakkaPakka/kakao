@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { comments, users, verifications, videos } from "@/db/schema";
+import {
+  comments,
+  users,
+  verificationRevocations,
+  verifications,
+  videos,
+} from "@/db/schema";
 import { ensureSchema } from "@/lib/dbInit";
-import { isSensei, isStaticVerified } from "@/lib/verified";
+import { VERIFIED_USERS, isSensei, isStaticVerified } from "@/lib/verified";
+import { getVerifiedSet } from "@/lib/verification";
 import { durationToMs, formatCountdown } from "@/lib/banTime";
 
 export { BAN_UNITS, durationToMs, formatCountdown } from "@/lib/banTime";
@@ -96,6 +103,8 @@ export type AdminAccountRow = {
   username: string;
   verified: boolean;
   staticVerified: boolean;
+  /** false = nazwa tylko z listy startowej, bez konta w bazie. */
+  registered: boolean;
   createdAt: string;
   hasAvatar: boolean;
   videos: number;
@@ -146,9 +155,7 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
 
   const vids = await db.select({ uploader: videos.uploader }).from(videos);
   const cmts = await db.select({ username: comments.username }).from(comments);
-  const grantedRows = await db
-    .select({ username: verifications.username })
-    .from(verifications);
+  const verifiedSet = await getVerifiedSet();
 
   const videoCount = new Map<string, number>();
   for (const v of vids)
@@ -156,12 +163,11 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
   const commentCount = new Map<string, number>();
   for (const c of cmts)
     commentCount.set(c.username, (commentCount.get(c.username) ?? 0) + 1);
-  const granted = new Set(grantedRows.map((v) => v.username.toLowerCase()));
-
-  return rows.map((row) => ({
+  const accounts: AdminAccountRow[] = rows.map((row) => ({
     username: row.username,
-    verified: granted.has(row.username.toLowerCase()),
+    verified: verifiedSet.has(row.username.toLowerCase()),
     staticVerified: isStaticVerified(row.username),
+    registered: true,
     createdAt: row.createdAt.toISOString(),
     hasAvatar: !!row.avatar,
     videos: videoCount.get(row.username) ?? 0,
@@ -174,6 +180,30 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
     passwordFingerprint: `${row.passwordHash.slice(0, 8)}…${row.passwordHash.slice(-4)}`,
     sensei: isSensei(row.username),
   }));
+
+  // Nazwy z listy startowej (np. SweetieFox, AlanDom), które nie mają konta
+  // w bazie – pokazujemy je, żeby sensei69 mógł odebrać im odznakę.
+  const known = new Set(rows.map((r) => r.username.toLowerCase()));
+  for (const name of VERIFIED_USERS) {
+    if (known.has(name.toLowerCase())) continue;
+    accounts.push({
+      username: name,
+      verified: verifiedSet.has(name.toLowerCase()),
+      staticVerified: true,
+      registered: false,
+      createdAt: "",
+      hasAvatar: false,
+      videos: 0,
+      comments: 0,
+      bannedUntil: null,
+      banReason: null,
+      remainingMs: 0,
+      passwordFingerprint: "—",
+      sensei: false,
+    });
+  }
+
+  return accounts;
 }
 
 export async function listAllVideos(): Promise<AdminVideoRow[]> {
@@ -249,6 +279,9 @@ export async function adminDeleteAccount(username: string): Promise<boolean> {
   await db.delete(videos).where(eq(videos.uploader, username));
   await db.delete(comments).where(eq(comments.username, username));
   await db.delete(verifications).where(eq(verifications.username, username));
+  await db
+    .delete(verificationRevocations)
+    .where(eq(verificationRevocations.username, username));
   await db.delete(users).where(eq(users.username, username));
   return true;
 }

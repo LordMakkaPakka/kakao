@@ -88,6 +88,13 @@ export function ensureSchema(): Promise<void> {
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS verification_revocations (
+          username TEXT PRIMARY KEY,
+          revoked_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
     })().catch((err) => {
       globalInit.__polhubSchemaReady = undefined;
       throw err;
