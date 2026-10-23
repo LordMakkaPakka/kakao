@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users, videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
+import { isVerifiedAccount } from "@/lib/verification";
 
 /** Dane konta: zdjęcie profilowe + własne filmy. */
 export async function GET(req: NextRequest) {
@@ -29,5 +30,10 @@ export async function GET(req: NextRequest) {
     .where(eq(videos.uploader, user))
     .orderBy(desc(videos.createdAt));
 
-  return NextResponse.json({ user, avatar: me?.avatar ?? null, videos: list });
+  return NextResponse.json({
+    user,
+    avatar: me?.avatar ?? null,
+    verified: await isVerifiedAccount(user),
+    videos: list,
+  });
 }

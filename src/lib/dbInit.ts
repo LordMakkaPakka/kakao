@@ -75,6 +75,13 @@ export function ensureSchema(): Promise<void> {
         CREATE UNIQUE INDEX IF NOT EXISTS comment_votes_comment_user_idx
           ON comment_votes (comment_id, username)
       `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS verifications (
+          username TEXT PRIMARY KEY,
+          granted_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
     })().catch((err) => {
       globalInit.__polhubSchemaReady = undefined;
       throw err;

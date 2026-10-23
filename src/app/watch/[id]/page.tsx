@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq, ne, sql, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { users, videos } from "@/db/schema";
-import { isVerified } from "@/lib/verified";
+import { getVerifiedSet } from "@/lib/verification";
 import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
 import IntroPlayer from "@/components/IntroPlayer";
@@ -54,7 +54,8 @@ export default async function WatchPage({
     .where(eq(users.username, video.uploader))
     .limit(1);
   const uploaderAvatar = uploaderRow?.avatar ?? null;
-  const verified = isVerified(video.uploader);
+  const verifiedSet = await getVerifiedSet();
+  const verified = verifiedSet.has(video.uploader.toLowerCase());
 
   const viewer = await getSessionUser();
   const initialComments = await listComments(videoId, viewer);
@@ -76,6 +77,11 @@ export default async function WatchPage({
     .where(ne(videos.id, videoId))
     .orderBy(desc(videos.createdAt))
     .limit(8);
+
+  const relatedCards = related.map((v) => ({
+    ...v,
+    uploaderVerified: verifiedSet.has(v.uploader.toLowerCase()),
+  }));
 
   return (
     <>
@@ -99,7 +105,7 @@ export default async function WatchPage({
             />
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
-              Intro PolHub dodawane automatycznie do każdego filmu
+              Intro PolHub jest częścią każdego filmu — dodawane automatycznie na początku
             </p>
 
             <h1 className="mt-4 font-display text-xl font-extrabold leading-snug text-white sm:text-2xl">
@@ -176,7 +182,7 @@ export default async function WatchPage({
             </h2>
             {related.length > 0 ? (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
-                {related.map((v, i) => (
+                {relatedCards.map((v, i) => (
                   <VideoCard key={v.id} video={v} index={i} />
                 ))}
               </div>

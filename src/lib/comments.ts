@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { commentVotes, comments } from "@/db/schema";
+import { getVerifiedSet } from "@/lib/verification";
 
 /** Komentarz w formie wysyłanej do przeglądarki. */
 export type CommentItem = {
@@ -13,6 +14,8 @@ export type CommentItem = {
   likes: number;
   dislikes: number;
   createdAt: string;
+  /** Czy autor ma odznakę weryfikacji. */
+  verified: boolean;
   myVote: "like" | "dislike" | null;
 };
 
@@ -67,9 +70,12 @@ export async function listComments(
     for (const v of votes) myVotes.set(v.commentId, v.value);
   }
 
+  const verifiedSet = await getVerifiedSet();
+
   return rows.map((r) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
+    verified: verifiedSet.has(r.username.toLowerCase()),
     myVote: voteLabel(myVotes.get(r.id)),
   }));
 }

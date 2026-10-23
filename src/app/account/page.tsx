@@ -4,7 +4,6 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
 import { authFetch } from "@/lib/clientAuth";
-import { isVerified } from "@/lib/verified";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
 
@@ -42,6 +41,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
   const [list, setList] = useState<MyVideo[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -55,6 +55,7 @@ export default function AccountPage() {
         const d = await r.json();
         setUser(d.user);
         setAvatar(d.avatar);
+        setVerified(d.verified === true);
         setList(d.videos);
       })
       .finally(() => setLoading(false));
@@ -143,10 +144,10 @@ export default function AccountPage() {
         <div className="text-center sm:text-left">
           <h1 className="flex items-center justify-center gap-2 font-display text-2xl font-extrabold text-white sm:justify-start">
             {user}
-            {isVerified(user) && <VerifiedBadge className="h-6 w-6" />}
+            {verified && <VerifiedBadge className="h-6 w-6" />}
           </h1>
           <p className="text-sm text-ph-muted">
-            {isVerified(user) ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"} · {list.length} filmów
+            {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"} · {list.length} filmów
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             <button

@@ -3,9 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authFetch, clearToken, fetchMe } from "@/lib/clientAuth";
-import { isVerified } from "@/lib/verified";
+import { authFetch, clearToken, fetchMeInfo } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { isSensei } from "@/lib/verified";
 import {
   Search,
   Upload,
@@ -16,14 +16,23 @@ import {
   User,
   UserPlus,
   Film,
+  ShieldCheck,
 } from "lucide-react";
 
-export default function Header({ user }: { user: string | null }) {
+export default function Header({
+  user,
+  verified = false,
+}: {
+  user: string | null;
+  verified?: boolean;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(user);
+  const [verifiedOverride, setVerifiedOverride] = useState<boolean | null>(null);
+  const currentVerified = verifiedOverride ?? verified;
   const [avatarV, setAvatarV] = useState(0);
   const [avatarOk, setAvatarOk] = useState(true);
 
@@ -39,10 +48,11 @@ export default function Header({ user }: { user: string | null }) {
   // Gdy przeglądarka blokuje ciasteczka (podgląd w iframe),
   // sesję potwierdzamy tokenem z localStorage.
   useEffect(() => {
-    setCurrentUser(user);
     let alive = true;
-    fetchMe().then((u) => {
-      if (alive && u) setCurrentUser(u);
+    fetchMeInfo().then((me) => {
+      if (!alive || !me.user) return;
+      setCurrentUser(me.user);
+      setVerifiedOverride(me.verified);
     });
     return () => {
       alive = false;
@@ -59,6 +69,7 @@ export default function Header({ user }: { user: string | null }) {
     await authFetch("/api/logout", { method: "POST" });
     clearToken();
     setCurrentUser(null);
+    setVerifiedOverride(false);
     setUserOpen(false);
     router.push("/");
     router.refresh();
@@ -132,9 +143,7 @@ export default function Header({ user }: { user: string | null }) {
                 </span>
                 <span className="hidden items-center gap-1 text-sm font-semibold md:flex">
                   {currentUser}
-                  {isVerified(currentUser) && (
-                    <VerifiedBadge className="h-3.5 w-3.5" />
-                  )}
+                  {currentVerified && <VerifiedBadge className="h-3.5 w-3.5" />}
                 </span>
                 <ChevronDown className="h-4 w-4 text-ph-muted" />
               </button>
@@ -144,9 +153,7 @@ export default function Header({ user }: { user: string | null }) {
                     <p className="text-xs text-ph-muted">Zalogowano jako</p>
                     <p className="flex items-center gap-1 font-display font-bold text-ph-orange">
                       {currentUser}
-                      {isVerified(currentUser) && (
-                        <VerifiedBadge className="h-4 w-4" />
-                      )}
+                      {currentVerified && <VerifiedBadge className="h-4 w-4" />}
                     </p>
                   </div>
                   <Link
@@ -163,6 +170,15 @@ export default function Header({ user }: { user: string | null }) {
                   >
                     <Film className="h-4 w-4 text-ph-muted" /> Moje przesyłanie
                   </Link>
+                  {isSensei(currentUser) && (
+                    <Link
+                      href="/weryfikacja"
+                      onClick={() => setUserOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-ph-orange transition-colors hover:bg-ph-dark"
+                    >
+                      <ShieldCheck className="h-4 w-4" /> Weryfikacja kont
+                    </Link>
+                  )}
                   <button
                     onClick={logout}
                     className="flex w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-ph-dark"

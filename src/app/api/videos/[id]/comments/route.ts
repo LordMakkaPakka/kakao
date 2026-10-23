@@ -5,6 +5,7 @@ import { comments, videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { listComments, MAX_COMMENT_LENGTH } from "@/lib/comments";
+import { isVerifiedAccount } from "@/lib/verification";
 
 /** Lista komentarzy pod filmem. */
 export async function GET(
@@ -117,6 +118,7 @@ export async function POST(
         likes: created.likes,
         dislikes: created.dislikes,
         createdAt: created.createdAt.toISOString(),
+        verified: await isVerifiedAccount(created.username),
         myVote: null,
       },
     },

@@ -89,3 +89,12 @@ export const commentVotes = pgTable(
 );
 
 export type CommentVote = typeof commentVotes.$inferSelect;
+
+/** Nadane odznaki weryfikacji (nadaje je konto sensei69). */
+export const verifications = pgTable("verifications", {
+  username: text("username").primaryKey(),
+  grantedBy: text("granted_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Verification = typeof verifications.$inferSelect;

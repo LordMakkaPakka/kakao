@@ -13,7 +13,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { authFetch, fetchMe, getToken } from "@/lib/clientAuth";
-import { isVerified } from "@/lib/verified";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { timeAgo } from "@/lib/format";
 import type { CommentItem } from "@/lib/comments";
@@ -382,7 +381,7 @@ export default function Comments({
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="flex items-center gap-1 font-display font-bold text-white">
               {comment.username}
-              {isVerified(comment.username) && (
+              {comment.verified && (
                 <VerifiedBadge className="h-4 w-4" />
               )}
             </span>

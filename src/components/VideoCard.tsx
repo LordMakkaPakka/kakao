@@ -14,6 +14,8 @@ export type VideoCardData = {
   title: string;
   category: string;
   uploader: string;
+  /** Czy uploader ma odznakę weryfikacji (liczone na serwerze). */
+  uploaderVerified?: boolean;
   durationSeconds: number;
   thumbnail: string | null;
   views: number;
@@ -78,7 +80,9 @@ export default function VideoCard({
         </h3>
         <p className="mt-1 flex items-center gap-1 text-xs text-ph-muted">
           {video.uploader}
-          {isVerified(video.uploader) && <VerifiedBadge className="h-3.5 w-3.5" />}
+          {(video.uploaderVerified ?? isVerified(video.uploader)) && (
+            <VerifiedBadge className="h-3.5 w-3.5" />
+          )}
         </p>
         <div className="mt-1 flex items-center gap-3 text-xs text-ph-muted">
           <span className="flex items-center gap-1">
