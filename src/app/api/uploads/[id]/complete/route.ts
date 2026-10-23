@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
+import { bannedResponse } from "@/lib/moderation";
 import { ensureSchema } from "@/lib/dbInit";
 import { finalizeUpload, pendingUploads } from "@/lib/uploadStore";
 
@@ -14,6 +15,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Brak sesji." }, { status: 401 });
   }
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const { id } = await ctx.params;
   const upload = pendingUploads.get(id);

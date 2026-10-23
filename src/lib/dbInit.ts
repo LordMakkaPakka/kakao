@@ -40,6 +40,12 @@ export function ensureSchema(): Promise<void> {
         )
       `);
       await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`);
+      await db.execute(
+        sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until TIMESTAMP`
+      );
+      await db.execute(
+        sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT`
+      );
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS comments (
           id SERIAL PRIMARY KEY,

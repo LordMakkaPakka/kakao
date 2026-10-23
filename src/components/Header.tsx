@@ -172,11 +172,11 @@ export default function Header({
                   </Link>
                   {isSensei(currentUser) && (
                     <Link
-                      href="/weryfikacja"
+                      href="/admin"
                       onClick={() => setUserOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-ph-orange transition-colors hover:bg-ph-dark"
                     >
-                      <ShieldCheck className="h-4 w-4" /> Weryfikacja kont
+                      <ShieldCheck className="h-4 w-4" /> Panel moderacji
                     </Link>
                   )}
                   <button

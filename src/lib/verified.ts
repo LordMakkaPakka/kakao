@@ -16,6 +16,11 @@ export function isVerified(username: string | null | undefined): boolean {
   return VERIFIED_USERS.some((u) => u.toLowerCase() === name);
 }
 
+/** Odznaka z listy stałej – nie można jej odebrać. */
+export function isStaticVerified(username: string): boolean {
+  return VERIFIED_USERS.some((u) => u.toLowerCase() === username.toLowerCase());
+}
+
 export function isSensei(username: string | null | undefined): boolean {
   return !!username && username.trim().toLowerCase() === SENSEI_USERNAME;
 }

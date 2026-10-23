@@ -5,6 +5,7 @@ import { commentVotes, comments } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { voteLabel } from "@/lib/comments";
+import { bannedResponse } from "@/lib/moderation";
 
 /**
  * Polubienie / odrzucenie komentarza.
@@ -21,6 +22,9 @@ export async function POST(
       { status: 401 }
     );
   }
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const { id } = await ctx.params;
   const commentId = Number(id);

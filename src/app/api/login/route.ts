@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { banMessage, getBanState } from "@/lib/moderation";
 import {
   createSessionToken,
   ensureFounderUser,
@@ -27,6 +28,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Nieprawidłowy login lub hasło." },
       { status: 401 }
+    );
+  }
+
+  const ban = await getBanState(user.username);
+  if (ban.banned) {
+    return NextResponse.json(
+      { error: `To konto jest ${banMessage(ban)}`, banned: true },
+      { status: 403 }
     );
   }
 

@@ -2,10 +2,11 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import { Ban, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
 import { authFetch } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
+import { formatCountdown } from "@/lib/banTime";
 
 type MyVideo = {
   id: number;
@@ -42,6 +43,7 @@ export default function AccountPage() {
   const [user, setUser] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
+  const [ban, setBan] = useState<{ reason: string | null; remainingMs: number } | null>(null);
   const [list, setList] = useState<MyVideo[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -56,6 +58,7 @@ export default function AccountPage() {
         setUser(d.user);
         setAvatar(d.avatar);
         setVerified(d.verified === true);
+        if (d.banned) setBan({ reason: d.banReason ?? null, remainingMs: Number(d.remainingMs) || 0 });
         setList(d.videos);
       })
       .finally(() => setLoading(false));
@@ -121,6 +124,17 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      {ban && (
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <Ban className="h-4 w-4 shrink-0" />
+          <span>
+            Konto jest zbanowane. Pozostało{" "}
+            <strong>{formatCountdown(ban.remainingMs)}</strong>
+            {ban.reason ? ` · powód: ${ban.reason}` : ""}. W tym czasie nie
+            możesz komentować, oceniać ani wrzucać filmów.
+          </span>
+        </div>
+      )}
       <div className="flex flex-col items-center gap-5 rounded-xl border border-ph-border bg-ph-dark p-6 sm:flex-row">
         <button
           onClick={() => fileRef.current?.click()}

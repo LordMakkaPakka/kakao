@@ -80,6 +80,9 @@ export default function IntroPlayer({
   const rateRef = useRef(1);
 
   const [phase, setPhase] = useState<Phase>("intro");
+  // Ref trzyma aktualną fazę natychmiast – handlery zdarzeń nie mogą
+  // czytać stanu, bo React aktualizuje go dopiero po przerysowaniu.
+  const phaseRef = useRef<Phase>("intro");
   const [introMounted, setIntroMounted] = useState(true);
   const [introFading, setIntroFading] = useState(false);
   const [introDuration, setIntroDuration] = useState(0);
@@ -90,6 +93,8 @@ export default function IntroPlayer({
   const [ended, setEnded] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [needsGesture, setNeedsGesture] = useState(false);
+  // Czy pierwsza próba startu już się rozstrzygnęła (żeby nie mrugał play).
+  const [started, setStarted] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [introTime, setIntroTime] = useState(0);
@@ -105,6 +110,11 @@ export default function IntroPlayer({
     () => (phase === "intro" ? introRef.current : mainRef.current),
     [phase]
   );
+
+  const changePhase = useCallback((next: Phase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
   const introLen = introBroken ? 0 : introDuration;
   const total = introLen + videoDuration;
   const position = phase === "intro" ? introTime : introLen + videoTime;
@@ -177,9 +187,13 @@ export default function IntroPlayer({
           el.play()
             .then(() => {
               setNeedsGesture(true);
+              setStarted(true);
               setNowPlaying(title, uploader);
             })
-            .catch(() => setNeedsGesture(true));
+            .catch(() => {
+              setNeedsGesture(true);
+              setStarted(true);
+            });
         });
     },
     [applySettings, title, uploader]
@@ -265,6 +279,8 @@ export default function IntroPlayer({
   const switchToVideo = useCallback(() => {
     const intro = introRef.current;
     const main = mainRef.current;
+    // Najpierw przestawiamy fazę (ref), żeby pauza intro nie zgasiła stanu.
+    changePhase("video");
     if (intro) intro.pause();
     if (main) {
       if (videoDuration > 0 && main.currentTime >= videoDuration - 0.05) {
@@ -273,12 +289,12 @@ export default function IntroPlayer({
       playElement(main);
     }
     wantsPlayRef.current = true;
-    setPhase("video");
+    setPlaying(true);
     setVideoTime(main?.currentTime ?? 0);
     setIntroFading(true);
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
     fadeTimerRef.current = setTimeout(() => setIntroMounted(false), INTRO_FADE_MS);
-  }, [playElement, videoDuration]);
+  }, [playElement, videoDuration, changePhase]);
 
   /* ===== Szukanie na wspólnej osi czasu ===== */
 
@@ -299,7 +315,7 @@ export default function IntroPlayer({
       if (nextPhase === "intro") {
         setIntroFading(false);
         if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
-        setPhase("intro");
+        changePhase("intro");
         setIntroTime(local);
         main?.pause();
 
@@ -319,7 +335,7 @@ export default function IntroPlayer({
 
       // Film – intro chowamy od razu (skoro szukamy dalej na osi czasu).
       if (intro) intro.pause();
-      setPhase("video");
+      changePhase("video");
       setIntroFading(false);
       setIntroMounted(false);
       if (!main) return;
@@ -327,7 +343,7 @@ export default function IntroPlayer({
       setVideoTime(local);
       playElement(main);
     },
-    [total, introLen, playElement, applySettings]
+    [total, introLen, playElement, applySettings, changePhase]
   );
 
   const togglePlay = useCallback(() => {
@@ -504,7 +520,10 @@ export default function IntroPlayer({
     togglePlay();
   };
 
-  const showCenterButton = !playing || ended;
+  // Przycisk play pokazujemy tylko, gdy naprawdę trzeba: pauza, koniec filmu
+  // albo gdy nie udało się w ogóle wystartować. Gdy intro/film leci (nawet
+  // wyciszony z powodu blokady autoplay), wielkie kółko nie zasłania obrazu.
+  const showCenterButton = ended || (started && !playing);
 
   return (
     <div
@@ -531,12 +550,12 @@ export default function IntroPlayer({
         onTimeUpdate={(e) => setVideoTime(e.currentTarget.currentTime)}
         onProgress={(e) => {
           const v = e.currentTarget;
-          if (phase === "video" && v.buffered.length > 0) {
+          if (phaseRef.current === "video" && v.buffered.length > 0) {
             setBuffered(v.buffered.end(v.buffered.length - 1));
           }
         }}
         onPlay={() => {
-          if (phase === "video") {
+          if (phaseRef.current === "video") {
             setPlaying(true);
             setEnded(false);
             setNowPlaying(title, uploader);
@@ -579,25 +598,25 @@ export default function IntroPlayer({
             onTimeUpdate={(e) => setIntroTime(e.currentTarget.currentTime)}
             onProgress={(e) => {
               const v = e.currentTarget;
-              if (phase === "intro" && v.buffered.length > 0) {
+              if (phaseRef.current === "intro" && v.buffered.length > 0) {
                 setBuffered(v.buffered.end(v.buffered.length - 1));
               }
             }}
             onPlay={() => {
-              if (phase === "intro") {
+              if (phaseRef.current === "intro") {
                 setPlaying(true);
                 setEnded(false);
                 setNowPlaying(title, uploader);
               }
             }}
             onPause={() => {
-              if (phase === "intro") setPlaying(false);
+              if (phaseRef.current === "intro") setPlaying(false);
             }}
             onWaiting={() => {
-              if (phase === "intro") setWaiting(true);
+              if (phaseRef.current === "intro") setWaiting(true);
             }}
             onPlaying={() => {
-              if (phase === "intro") setWaiting(false);
+              if (phaseRef.current === "intro") setWaiting(false);
             }}
             onEnded={onIntroEnded}
             onError={onIntroError}
@@ -645,8 +664,8 @@ export default function IntroPlayer({
         </button>
       )}
 
-      {/* Przypomnienie o dźwięku, gdy przeglądarka zablokowała autoplay z audio */}
-      {needsGesture && playing && !ended && (
+      {/* Szybkie włączenie dźwięku (np. gdy przeglądarka zablokowała autoplay z audio) */}
+      {muted && started && !ended && (
         <button
           type="button"
           onClick={toggleMute}

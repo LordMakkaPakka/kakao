@@ -6,6 +6,7 @@ import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { listComments, MAX_COMMENT_LENGTH } from "@/lib/comments";
 import { isVerifiedAccount } from "@/lib/verification";
+import { bannedResponse } from "@/lib/moderation";
 
 /** Lista komentarzy pod filmem. */
 export async function GET(
@@ -35,6 +36,9 @@ export async function POST(
       { status: 401 }
     );
   }
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const { id } = await ctx.params;
   const videoId = Number(id);
