@@ -5,6 +5,8 @@ import {
   integer,
   timestamp,
   customType,
+  uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -42,3 +44,43 @@ export const videos = pgTable("videos", {
 });
 
 export type Video = typeof videos.$inferSelect;
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: serial("id").primaryKey(),
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    body: text("body").notNull(),
+    likes: integer("likes").notNull().default(0),
+    dislikes: integer("dislikes").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("comments_video_id_idx").on(table.videoId)]
+);
+
+export type Comment = typeof comments.$inferSelect;
+
+/** Jeden głos na komentarz: 1 = lubię, -1 = nie lubię. */
+export const commentVotes = pgTable(
+  "comment_votes",
+  {
+    id: serial("id").primaryKey(),
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    value: integer("value").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("comment_votes_comment_user_idx").on(
+      table.commentId,
+      table.username
+    ),
+  ]
+);
+
+export type CommentVote = typeof commentVotes.$inferSelect;

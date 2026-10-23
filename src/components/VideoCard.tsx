@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Eye, ThumbsUp, Play, BadgeCheck, Film } from "lucide-react";
+import { Eye, ThumbsUp, Play, Film } from "lucide-react";
 import {
   formatDuration,
   formatViews,
@@ -7,6 +7,7 @@ import {
   timeAgo,
 } from "@/lib/format";
 import { isVerified } from "@/lib/verified";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export type VideoCardData = {
   id: number;
@@ -77,7 +78,7 @@ export default function VideoCard({
         </h3>
         <p className="mt-1 flex items-center gap-1 text-xs text-ph-muted">
           {video.uploader}
-          {isVerified(video.uploader) && <BadgeCheck className="h-3.5 w-3.5 text-ph-orange" />}
+          {isVerified(video.uploader) && <VerifiedBadge className="h-3.5 w-3.5" />}
         </p>
         <div className="mt-1 flex items-center gap-3 text-xs text-ph-muted">
           <span className="flex items-center gap-1">

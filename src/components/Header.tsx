@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch, clearToken, fetchMe } from "@/lib/clientAuth";
+import { isVerified } from "@/lib/verified";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import {
   Search,
   Upload,
@@ -128,14 +130,24 @@ export default function Header({ user }: { user: string | null }) {
                     currentUser.charAt(0)
                   )}
                 </span>
-                <span className="hidden text-sm font-semibold md:inline">{currentUser}</span>
+                <span className="hidden items-center gap-1 text-sm font-semibold md:flex">
+                  {currentUser}
+                  {isVerified(currentUser) && (
+                    <VerifiedBadge className="h-3.5 w-3.5" />
+                  )}
+                </span>
                 <ChevronDown className="h-4 w-4 text-ph-muted" />
               </button>
               {userOpen && (
                 <div className="animate-fade-up absolute right-0 top-full mt-2 w-48 overflow-hidden rounded-lg border border-ph-border bg-ph-panel shadow-2xl">
                   <div className="border-b border-ph-border px-4 py-3">
                     <p className="text-xs text-ph-muted">Zalogowano jako</p>
-                    <p className="font-display font-bold text-ph-orange">{currentUser}</p>
+                    <p className="flex items-center gap-1 font-display font-bold text-ph-orange">
+                      {currentUser}
+                      {isVerified(currentUser) && (
+                        <VerifiedBadge className="h-4 w-4" />
+                      )}
+                    </p>
                   </div>
                   <Link
                     href="/account"

@@ -8,9 +8,13 @@ import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
 import IntroPlayer from "@/components/IntroPlayer";
 import CategoryBar from "@/components/CategoryBar";
+import Comments from "@/components/Comments";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
 import { ensureSchema } from "@/lib/dbInit";
-import { Eye, BadgeCheck, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
+import { getSessionUser } from "@/lib/auth";
+import { listComments } from "@/lib/comments";
+import { Eye, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +55,9 @@ export default async function WatchPage({
     .limit(1);
   const uploaderAvatar = uploaderRow?.avatar ?? null;
   const verified = isVerified(video.uploader);
+
+  const viewer = await getSessionUser();
+  const initialComments = await listComments(videoId, viewer);
 
   const related = await db
     .select({
@@ -138,7 +145,7 @@ export default async function WatchPage({
                 <div>
                   <p className="flex items-center gap-1.5 font-display font-bold text-white">
                     {video.uploader}{" "}
-                    {verified && <BadgeCheck className="h-4 w-4 text-ph-orange" />}
+                    {verified && <VerifiedBadge className="h-4 w-4" />}
                   </p>
                   <p className="text-xs text-ph-muted">
                     {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"}
@@ -154,6 +161,12 @@ export default async function WatchPage({
                 </p>
               )}
             </div>
+
+            <Comments
+              videoId={video.id}
+              initialComments={initialComments}
+              me={viewer}
+            />
           </div>
 
           {/* Related */}

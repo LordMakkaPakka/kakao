@@ -2,9 +2,10 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import { Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
 import { authFetch } from "@/lib/clientAuth";
 import { isVerified } from "@/lib/verified";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
 
 type MyVideo = {
@@ -142,7 +143,7 @@ export default function AccountPage() {
         <div className="text-center sm:text-left">
           <h1 className="flex items-center justify-center gap-2 font-display text-2xl font-extrabold text-white sm:justify-start">
             {user}
-            {isVerified(user) && <BadgeCheck className="h-6 w-6 text-ph-orange" aria-label="Zweryfikowany" />}
+            {isVerified(user) && <VerifiedBadge className="h-6 w-6" />}
           </h1>
           <p className="text-sm text-ph-muted">
             {isVerified(user) ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"} · {list.length} filmów
