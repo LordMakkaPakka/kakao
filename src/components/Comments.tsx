@@ -5,8 +5,8 @@ import Link from "next/link";
 import {
   Loader2,
   Send,
-  ThumbsDown,
-  ThumbsUp,
+  Heart,
+  HeartCrack,
   MessageSquare,
   LogIn,
   CornerDownRight,
@@ -59,15 +59,20 @@ function VoteButtons({
         type="button"
         onClick={() => onVote("like")}
         disabled={disabled}
-        aria-label="Polub komentarz"
+        aria-label="Polub komentarz (serduszko)"
         aria-pressed={comment.myVote === "like"}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
           comment.myVote === "like"
-            ? "bg-green-500 text-black"
-            : "bg-ph-panel text-ph-muted hover:bg-green-500/15 hover:text-green-400"
+            ? "bg-[#ff3b6b] text-white"
+            : "bg-ph-panel text-ph-muted hover:bg-[#ff3b6b]/15 hover:text-[#ff5c85]"
         }`}
       >
-        <ThumbsUp className="h-3.5 w-3.5" /> {comment.likes}
+        <Heart
+          className={`h-3.5 w-3.5 ${
+            comment.myVote === "like" ? "fill-current" : ""
+          }`}
+        />{" "}
+        {comment.likes}
       </button>
       <button
         type="button"
@@ -77,11 +82,11 @@ function VoteButtons({
         aria-pressed={comment.myVote === "dislike"}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
           comment.myVote === "dislike"
-            ? "bg-red-500 text-black"
-            : "bg-ph-panel text-ph-muted hover:bg-red-500/15 hover:text-red-400"
+            ? "bg-ph-border text-white"
+            : "bg-ph-panel text-ph-muted hover:bg-ph-border hover:text-white"
         }`}
       >
-        <ThumbsDown className="h-3.5 w-3.5" /> {comment.dislikes}
+        <HeartCrack className="h-3.5 w-3.5" /> {comment.dislikes}
       </button>
     </>
   );

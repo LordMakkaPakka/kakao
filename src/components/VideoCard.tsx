@@ -65,9 +65,6 @@ export default function VideoCard({
         <span className="absolute bottom-1.5 right-1.5 rounded bg-black/85 px-1.5 py-0.5 font-display text-xs font-bold text-white">
           {formatDuration(video.durationSeconds)}
         </span>
-        <span className="absolute bottom-1.5 left-1.5 rounded bg-ph-orange px-1.5 py-0.5 font-display text-[10px] font-black text-black">
-          HD
-        </span>
         <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-ph-muted">
           {video.category}
         </span>

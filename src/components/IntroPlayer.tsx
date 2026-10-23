@@ -25,12 +25,13 @@ import {
 import { formatDuration } from "@/lib/format";
 
 /**
- * Intro PolHub jest częścią każdego filmu – odtwarzacz gra je jako pierwszy
- * fragment tego samego materiału (jedna oś czasu, jedno okno), a nie jako
- * osobną nakładkę. Intro zawsze idzie z dźwiękiem – nigdy nie jest wyciszane.
+ * Intro PolHub jest częścią każdego filmu – leci jako pierwszy fragment
+ * (jedna oś czasu, jedno okno), a po nim film startuje automatycznie,
+ * bez zatrzymania. Intro zawsze idzie z dźwiękiem.
  */
 const INTRO_SRC = "/intro.mov";
 const HIDE_CONTROLS_MS = 2600;
+const INTRO_FADE_MS = 320;
 
 const NOW_PLAYING_ARTWORK = "/ph-artwork.jpeg";
 
@@ -65,18 +66,22 @@ export default function IntroPlayer({
   uploader?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const introRef = useRef<HTMLVideoElement>(null);
+  const mainRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draggingRef = useRef(false);
   const wantsPlayRef = useRef(true);
-  const pendingSeekRef = useRef<number | null>(null);
+  const pendingIntroSeekRef = useRef<number | null>(null);
   const volumeRef = useRef(1);
   const mutedRef = useRef(false);
   const rateRef = useRef(1);
 
   const [phase, setPhase] = useState<Phase>("intro");
+  const [introMounted, setIntroMounted] = useState(true);
+  const [introFading, setIntroFading] = useState(false);
   const [introDuration, setIntroDuration] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [introBroken, setIntroBroken] = useState(false);
@@ -87,7 +92,8 @@ export default function IntroPlayer({
   const [needsGesture, setNeedsGesture] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
-  const [time, setTime] = useState(0);
+  const [introTime, setIntroTime] = useState(0);
+  const [videoTime, setVideoTime] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -95,9 +101,13 @@ export default function IntroPlayer({
   const [rate, setRate] = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  const active = useCallback(
+    () => (phase === "intro" ? introRef.current : mainRef.current),
+    [phase]
+  );
   const introLen = introBroken ? 0 : introDuration;
   const total = introLen + videoDuration;
-  const position = phase === "intro" ? time : introLen + time;
+  const position = phase === "intro" ? introTime : introLen + videoTime;
   const progress = total > 0 ? Math.min(1, Math.max(0, position / total)) : 0;
   const bufferedPos = phase === "intro" ? buffered : introLen + buffered;
   const bufferedPct =
@@ -105,39 +115,75 @@ export default function IntroPlayer({
   const hoverClamped =
     hoverPct === null ? 0 : Math.min(Math.max(hoverPct * 100, 7), 93);
   const isIntroPhase = phase === "intro" && !introBroken && introLen > 0;
-  const barVisible =
-    controlsVisible || !playing || settingsOpen || needsGesture || ended;
+  const barVisible = controlsVisible || !playing || settingsOpen || ended;
   const VolumeIcon =
     muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
-  /* ===== Długości obu części (intro + film) ===== */
+  /* ===== Długości obu części osi czasu ===== */
 
+  // Metadane potrafią wczytać się szybciej niż React podepnie handler
+  // (szczególnie na szybkim łączu), dlatego długości dosynchronizowujemy
+  // także przez krótki polling na referencjach.
   useEffect(() => {
-    const introProbe = document.createElement("video");
-    introProbe.preload = "metadata";
-    introProbe.src = INTRO_SRC;
-    introProbe.onloadedmetadata = () => {
-      const d = introProbe.duration;
-      if (Number.isFinite(d) && d > 0) setIntroDuration(d);
+    let ticks = 0;
+    const sync = () => {
+      ticks += 1;
+      const i = introRef.current;
+      const m = mainRef.current;
+      let done = true;
+      if (i && Number.isFinite(i.duration) && i.duration > 0) {
+        setIntroDuration(i.duration);
+      } else done = false;
+      if (m && Number.isFinite(m.duration) && m.duration > 0) {
+        setVideoDuration(m.duration);
+      } else done = false;
+      if (done || ticks > 50) clearInterval(id);
     };
-    introProbe.onerror = () => {
-      setIntroBroken(true);
-      setPhase("video");
-    };
+    sync();
+    const id = setInterval(sync, 200);
+    return () => clearInterval(id);
+  }, []);
 
-    const videoProbe = document.createElement("video");
-    videoProbe.preload = "metadata";
-    videoProbe.src = src;
-    videoProbe.onloadedmetadata = () => {
-      const d = videoProbe.duration;
-      if (Number.isFinite(d) && d > 0) setVideoDuration(d);
-    };
+  /* ===== Pomocnicze: aplikowanie ustawień na oba odtwarzacze ===== */
 
-    return () => {
-      introProbe.removeAttribute("src");
-      videoProbe.removeAttribute("src");
-    };
-  }, [src]);
+  const applySettings = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    el.volume = volumeRef.current;
+    el.muted = mutedRef.current;
+    el.playbackRate = rateRef.current;
+  }, []);
+
+  /**
+   * Próba odtwarzania z dźwiękiem. Jeśli przeglądarka odmówi
+   * (polityka autoplay), odtwarzacz i tak rusza dalej – tylko wyciszony,
+   * z wyraźnym przyciskiem do włączenia dźwięku. Film nigdy nie staje.
+   */
+  const playElement = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (!el) return;
+      wantsPlayRef.current = true;
+      applySettings(el);
+      el.play()
+        .then(() => {
+          setNeedsGesture(false);
+          setNowPlaying(title, uploader);
+        })
+        .catch(() => {
+          if (!el.muted) {
+            el.muted = true;
+            mutedRef.current = true;
+            setMuted(true);
+          }
+          el.play()
+            .then(() => {
+              setNeedsGesture(true);
+              setNowPlaying(title, uploader);
+            })
+            .catch(() => setNeedsGesture(true));
+        });
+    },
+    [applySettings, title, uploader]
+  );
 
   /* ===== Pełny ekran ===== */
 
@@ -149,12 +195,12 @@ export default function IntroPlayer({
     const el = containerRef.current;
     if (el?.requestFullscreen) {
       el.requestFullscreen().catch(() => {
-        (videoRef.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
+        (active() as WebkitVideo | null)?.webkitEnterFullscreen?.();
       });
     } else {
-      (videoRef.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
+      (active() as WebkitVideo | null)?.webkitEnterFullscreen?.();
     }
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement);
@@ -168,21 +214,22 @@ export default function IntroPlayer({
     setControlsVisible(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      const v = videoRef.current;
+      const v = active();
       if (v && !v.paused && !draggingRef.current) setControlsVisible(false);
     }, HIDE_CONTROLS_MS);
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     const start = setTimeout(() => {
-      const v = videoRef.current;
+      const v = active();
       if (v && !v.paused) setControlsVisible(false);
     }, HIDE_CONTROLS_MS);
     return () => {
       clearTimeout(start);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
     };
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -200,104 +247,150 @@ export default function IntroPlayer({
     return () => document.removeEventListener("pointerdown", onDocPointerDown);
   }, [settingsOpen]);
 
-  /* ===== Odtwarzanie ===== */
+  /* ===== Start: intro gra pierwsze, z dźwiękiem ===== */
 
-  const startPlayback = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
+  useEffect(() => {
+    const intro = introRef.current;
+    if (intro) playElement(intro);
+    // film czeka przygotowany w tle
+    const main = mainRef.current;
+    if (main) {
+      applySettings(main);
+      main.load();
+    }
+  }, [applySettings, playElement]);
+
+  /* ===== Przejście intro → film (bez zatrzymania) ===== */
+
+  const switchToVideo = useCallback(() => {
+    const intro = introRef.current;
+    const main = mainRef.current;
+    if (intro) intro.pause();
+    if (main) {
+      if (videoDuration > 0 && main.currentTime >= videoDuration - 0.05) {
+        main.currentTime = 0;
+      }
+      playElement(main);
+    }
     wantsPlayRef.current = true;
-    v.play()
-      .then(() => {
-        setNeedsGesture(false);
-        setNowPlaying(title, uploader);
-      })
-      .catch(() => setNeedsGesture(true));
-  }, [title, uploader]);
+    setPhase("video");
+    setVideoTime(main?.currentTime ?? 0);
+    setIntroFading(true);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    fadeTimerRef.current = setTimeout(() => setIntroMounted(false), INTRO_FADE_MS);
+  }, [playElement, videoDuration]);
 
   /* ===== Szukanie na wspólnej osi czasu ===== */
 
-  const seekToPosition = useCallback((target: number) => {
-    if (!total) return;
-    const clamped = Math.max(0, Math.min(total, target));
-    const nextPhase: Phase = introLen > 0 && clamped < introLen ? "intro" : "video";
-    const local =
-      nextPhase === "intro" ? clamped : Math.max(0, clamped - introLen);
-    const v = videoRef.current;
+  const seekToPosition = useCallback(
+    (target: number) => {
+      if (!total) return;
+      const clamped = Math.max(0, Math.min(total, target));
+      const nextPhase: Phase =
+        introLen > 0 && clamped < introLen ? "intro" : "video";
+      const local =
+        nextPhase === "intro" ? clamped : Math.max(0, clamped - introLen);
+      const intro = introRef.current;
+      const main = mainRef.current;
 
-    setEnded(false);
-    wantsPlayRef.current = true;
+      setEnded(false);
+      wantsPlayRef.current = true;
 
-    if (nextPhase === phase && v) {
-      v.currentTime = local;
-      setTime(local);
-      // Przewinięcie nie zatrzymuje odtwarzania.
-      if (v.paused) startPlayback();
-      return;
-    }
-    pendingSeekRef.current = local;
-    setTime(local);
-    setPhase(nextPhase);
-  }, [total, introLen, phase, startPlayback]);
+      if (nextPhase === "intro") {
+        setIntroFading(false);
+        if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+        setPhase("intro");
+        setIntroTime(local);
+        main?.pause();
+
+        if (!intro) {
+          // Intro było już schowane – montujemy je ponownie i ustawiamy czas
+          // w onLoadedMetadata (patrz pendingIntroSeekRef).
+          pendingIntroSeekRef.current = local;
+          applySettings(introRef.current);
+          setIntroMounted(true);
+          return;
+        }
+        setIntroMounted(true);
+        intro.currentTime = local;
+        playElement(intro);
+        return;
+      }
+
+      // Film – intro chowamy od razu (skoro szukamy dalej na osi czasu).
+      if (intro) intro.pause();
+      setPhase("video");
+      setIntroFading(false);
+      setIntroMounted(false);
+      if (!main) return;
+      main.currentTime = local;
+      setVideoTime(local);
+      playElement(main);
+    },
+    [total, introLen, playElement, applySettings]
+  );
 
   const togglePlay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused || v.ended || needsGesture) {
-      // Po zakończeniu film leci od nowa – razem z intro.
+    const el = active();
+    if (!el) return;
+    if (el.paused || el.ended || needsGesture) {
       if (ended) {
         seekToPosition(0);
         return;
       }
-      startPlayback();
+      playElement(el);
     } else {
-      v.pause();
+      el.pause();
     }
     pokeControls();
-  }, [needsGesture, ended, seekToPosition, startPlayback, pokeControls]);
+  }, [active, needsGesture, ended, seekToPosition, playElement, pokeControls]);
 
-  const onLoadedMetadata = () => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    v.volume = volumeRef.current;
-    v.muted = mutedRef.current;
-    v.playbackRate = rateRef.current;
-
-    if (Number.isFinite(v.duration) && v.duration > 0) {
-      if (phase === "intro") setIntroDuration(v.duration);
-      else setVideoDuration(v.duration);
-    }
-
-    if (pendingSeekRef.current !== null) {
-      v.currentTime = pendingSeekRef.current;
-      pendingSeekRef.current = null;
-    }
-
-    if (wantsPlayRef.current) startPlayback();
+  const skipIntro = () => {
+    if (!introLen) return;
+    seekToPosition(introLen + 0.05);
   };
 
-  const onEnded = () => {
-    if (phase === "intro") {
-      // Intro kończy się płynnie przejściem do właściwego filmu.
-      wantsPlayRef.current = true;
-      setTime(0);
-      setPhase("video");
-      return;
+  /* ===== Zdarzenia odtwarzaczy ===== */
+
+  const onIntroMeta = () => {
+    const el = introRef.current;
+    if (!el) return;
+    applySettings(el);
+    if (Number.isFinite(el.duration) && el.duration > 0) {
+      setIntroDuration(el.duration);
     }
+    // Powrót do intro po przewinięciu (intro mogło być już odmontowane).
+    if (pendingIntroSeekRef.current !== null) {
+      el.currentTime = pendingIntroSeekRef.current;
+      setIntroTime(pendingIntroSeekRef.current);
+      pendingIntroSeekRef.current = null;
+    }
+    if (wantsPlayRef.current) playElement(el);
+  };
+
+  const onMainMeta = () => {
+    const el = mainRef.current;
+    if (!el) return;
+    applySettings(el);
+    if (Number.isFinite(el.duration) && el.duration > 0) {
+      setVideoDuration(el.duration);
+    }
+  };
+
+  const onIntroEnded = () => switchToVideo();
+
+  const onIntroError = () => {
+    setIntroBroken(true);
+    switchToVideo();
+  };
+
+  const onMainEnded = () => {
     setPlaying(false);
     setWaiting(false);
     setEnded(true);
   };
 
-  const onError = () => {
-    if (phase === "intro") {
-      setIntroBroken(true);
-      wantsPlayRef.current = true;
-      setPhase("video");
-      return;
-    }
-    setWaiting(false);
-  };
+  /* ===== Pasek postępu ===== */
 
   const pctFromEvent = (clientX: number) => {
     const el = trackRef.current;
@@ -328,39 +421,40 @@ export default function IntroPlayer({
     pokeControls();
   };
 
-  const skipIntro = () => {
-    if (!introLen) return;
-    seekToPosition(introLen + 0.05);
-  };
-
   /* ===== Głośność i prędkość ===== */
 
   const setVolumeTo = (value: number) => {
-    const v = videoRef.current;
     const next = Math.min(1, Math.max(0, value));
     volumeRef.current = next;
     mutedRef.current = next === 0;
-    if (v) {
-      v.volume = next;
-      v.muted = next === 0;
+    for (const el of [introRef.current, mainRef.current]) {
+      if (!el) continue;
+      el.volume = next;
+      el.muted = next === 0;
     }
     setVolume(next);
     setMuted(next === 0);
+    if (next > 0) setNeedsGesture(false);
   };
 
   const toggleMute = () => {
-    const v = videoRef.current;
-    const nextMuted = !(mutedRef.current || v?.muted);
+    const nextMuted = !(mutedRef.current || muted);
     mutedRef.current = nextMuted;
-    if (v) v.muted = nextMuted;
+    for (const el of [introRef.current, mainRef.current]) {
+      if (el) el.muted = nextMuted;
+    }
     setMuted(nextMuted);
-    if (!nextMuted && volumeRef.current === 0) setVolumeTo(0.6);
+    if (!nextMuted) {
+      setNeedsGesture(false);
+      if (volumeRef.current === 0) setVolumeTo(0.6);
+    }
   };
 
   const changeRate = (value: number) => {
-    const v = videoRef.current;
     rateRef.current = value;
-    if (v) v.playbackRate = value;
+    for (const el of [introRef.current, mainRef.current]) {
+      if (el) el.playbackRate = value;
+    }
     setRate(value);
     setSettingsOpen(false);
   };
@@ -399,8 +493,7 @@ export default function IntroPlayer({
     }
   };
 
-  const onVideoClick = (e: ReactMouseEvent<HTMLVideoElement>) => {
-    // Pojedyncze kliknięcie = play/pause, podwójne = pełny ekran.
+  const onSurfaceClick = (e: ReactMouseEvent<HTMLElement>) => {
     if (e.detail > 1) return;
     containerRef.current?.focus({ preventScroll: true });
     setSettingsOpen(false);
@@ -411,7 +504,7 @@ export default function IntroPlayer({
     togglePlay();
   };
 
-  const showCenterButton = !playing || needsGesture || ended;
+  const showCenterButton = !playing || ended;
 
   return (
     <div
@@ -427,39 +520,98 @@ export default function IntroPlayer({
       }`}
       aria-label={`Odtwarzacz: ${title}`}
     >
+      {/* Film – zawsze zamontowany i wstępnie wczytany */}
       <video
-        key={phase}
-        ref={videoRef}
-        src={phase === "intro" ? INTRO_SRC : src}
-        poster={phase === "video" ? poster ?? undefined : undefined}
+        ref={mainRef}
+        src={src}
+        poster={poster ?? undefined}
         playsInline
         preload="auto"
-        onClick={onVideoClick}
-        onDoubleClick={toggleFullscreen}
-        onLoadedMetadata={onLoadedMetadata}
-        onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={onMainMeta}
+        onTimeUpdate={(e) => setVideoTime(e.currentTarget.currentTime)}
         onProgress={(e) => {
           const v = e.currentTarget;
-          if (v.buffered.length > 0) {
+          if (phase === "video" && v.buffered.length > 0) {
             setBuffered(v.buffered.end(v.buffered.length - 1));
           }
         }}
         onPlay={() => {
-          setPlaying(true);
-          setEnded(false);
-          setNowPlaying(title, uploader);
+          if (phase === "video") {
+            setPlaying(true);
+            setEnded(false);
+            setNowPlaying(title, uploader);
+          }
         }}
-        onPause={() => setPlaying(false)}
-        onWaiting={() => setWaiting(true)}
-        onPlaying={() => setWaiting(false)}
-        onCanPlay={() => setWaiting(false)}
+        onPause={() => {
+          if (phase === "video") setPlaying(false);
+        }}
+        onWaiting={() => {
+          if (phase === "video") setWaiting(true);
+        }}
+        onPlaying={() => {
+          if (phase === "video") setWaiting(false);
+        }}
+        onCanPlay={() => {
+          if (phase === "video") setWaiting(false);
+        }}
         onVolumeChange={(e) => {
           setVolume(e.currentTarget.volume);
           setMuted(e.currentTarget.muted);
         }}
-        onEnded={onEnded}
-        onError={onError}
+        onEnded={onMainEnded}
+        onError={() => setWaiting(false)}
         className="absolute inset-0 h-full w-full bg-black object-contain"
+      />
+
+      {/* Intro – gra jako pierwszy fragment, potem płynnie znika */}
+      {introMounted && !introBroken && (
+        <div
+          className={`pointer-events-none absolute inset-0 z-[5] bg-black transition-opacity duration-300 ${
+            introFading ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <video
+            ref={introRef}
+            src={INTRO_SRC}
+            playsInline
+            preload="auto"
+            onLoadedMetadata={onIntroMeta}
+            onTimeUpdate={(e) => setIntroTime(e.currentTarget.currentTime)}
+            onProgress={(e) => {
+              const v = e.currentTarget;
+              if (phase === "intro" && v.buffered.length > 0) {
+                setBuffered(v.buffered.end(v.buffered.length - 1));
+              }
+            }}
+            onPlay={() => {
+              if (phase === "intro") {
+                setPlaying(true);
+                setEnded(false);
+                setNowPlaying(title, uploader);
+              }
+            }}
+            onPause={() => {
+              if (phase === "intro") setPlaying(false);
+            }}
+            onWaiting={() => {
+              if (phase === "intro") setWaiting(true);
+            }}
+            onPlaying={() => {
+              if (phase === "intro") setWaiting(false);
+            }}
+            onEnded={onIntroEnded}
+            onError={onIntroError}
+            className="h-full w-full scale-[1.02] object-cover"
+            aria-label="Intro PolHub"
+          />
+        </div>
+      )}
+
+      {/* Warstwa klikalna nad obrazem */}
+      <div
+        onClick={onSurfaceClick}
+        onDoubleClick={toggleFullscreen}
+        className="absolute inset-0 z-10"
       />
 
       {/* Ładowanie */}
@@ -484,12 +636,23 @@ export default function IntroPlayer({
               <Play className="ml-1 h-8 w-8 fill-white text-white" />
             )}
           </span>
-          {needsGesture && (
+          {needsGesture && !ended && (
             <span className="flex items-center gap-1.5 rounded-[3px] bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white/90">
               <Volume2 className="h-3.5 w-3.5 text-ph-orange" />
               Kliknij, aby odtworzyć z dźwiękiem
             </span>
           )}
+        </button>
+      )}
+
+      {/* Przypomnienie o dźwięku, gdy przeglądarka zablokowała autoplay z audio */}
+      {needsGesture && playing && !ended && (
+        <button
+          type="button"
+          onClick={toggleMute}
+          className="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-[3px] bg-black/75 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-ph-orange hover:text-black"
+        >
+          <VolumeX className="h-3.5 w-3.5" /> Włącz dźwięk
         </button>
       )}
 
@@ -623,13 +786,6 @@ export default function IntroPlayer({
             </div>
           </div>
 
-          <span
-            title="Materiał w jakości HD"
-            className="hidden shrink-0 rounded-[2px] bg-ph-orange px-1 py-[1px] font-display text-[10px] font-black leading-tight text-black sm:block"
-          >
-            HD
-          </span>
-
           {isIntroPhase && (
             <button
               type="button"
@@ -669,9 +825,6 @@ export default function IntroPlayer({
                     {rate === value && <span className="text-ph-orange">✓</span>}
                   </button>
                 ))}
-                <p className="mt-1 border-t border-white/10 px-3 py-1.5 text-[10px] text-white/45">
-                  Jakość: HD (auto)
-                </p>
               </div>
             )}
           </div>
