@@ -6,44 +6,73 @@ import { SkipForward, RotateCcw, Volume2 } from "lucide-react";
 const INTRO_TOTAL_MS = 3200;
 const INTRO_FADE_MS = 450;
 
-/** Syntezowany bęben intro (ba-dum-tss) – generowany, bez zewnętrznych plików. */
-function playIntroDrums(ctx: AudioContext) {
-  const t0 = ctx.currentTime + 0.35;
+const INTRO_AUDIO_URL = "/intro.mp3";
+let customIntroBuffer: Promise<ArrayBuffer | null> | null = null;
 
-  const kick = (time: number) => {
+function loadCustomIntro() {
+  customIntroBuffer ??= fetch(INTRO_AUDIO_URL)
+    .then((res) => (res.ok ? res.arrayBuffer() : null))
+    .catch(() => null);
+  return customIntroBuffer;
+}
+
+/** Głęboki, rezonujący "bwooom" w stylu intro – syntezowany w Web Audio. */
+function playSynthIntro(ctx: AudioContext) {
+  const t0 = ctx.currentTime + 0.3;
+  const duration = 2.2;
+
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  master.gain.exponentialRampToValueAtTime(0.8, t0 + 0.04);
+  master.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 9;
+  filter.frequency.setValueAtTime(1800, t0);
+  filter.frequency.exponentialRampToValueAtTime(120, t0 + 1.4);
+
+  filter.connect(master).connect(ctx.destination);
+
+  [55, 55.6, 110.4].forEach((freq, i) => {
     const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(150, time);
-    osc.frequency.exponentialRampToValueAtTime(42, time + 0.22);
-    gain.gain.setValueAtTime(0.9, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.32);
-  };
+    osc.type = i === 2 ? "square" : "sawtooth";
+    osc.frequency.setValueAtTime(freq * 1.5, t0);
+    osc.frequency.exponentialRampToValueAtTime(freq, t0 + 0.12);
+    const g = ctx.createGain();
+    g.gain.value = i === 2 ? 0.15 : 0.35;
+    osc.connect(g).connect(filter);
+    osc.start(t0);
+    osc.stop(t0 + duration);
+  });
 
-  const tss = (time: number) => {
-    const duration = 0.5;
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 6500;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.35, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-    noise.connect(filter).connect(gain).connect(ctx.destination);
-    noise.start(time);
-    noise.stop(time + duration);
-  };
+  const sub = ctx.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(80, t0);
+  sub.frequency.exponentialRampToValueAtTime(41, t0 + 0.3);
+  const subGain = ctx.createGain();
+  subGain.gain.setValueAtTime(0.9, t0);
+  subGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+  sub.connect(subGain).connect(ctx.destination);
+  sub.start(t0);
+  sub.stop(t0 + 1.7);
+}
 
-  kick(t0);
-  kick(t0 + 0.32);
-  tss(t0 + 0.64);
+async function playIntroSound(ctx: AudioContext) {
+  const raw = await loadCustomIntro();
+  if (raw) {
+    try {
+      const buffer = await ctx.decodeAudioData(raw.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(ctx.currentTime + 0.2);
+      return;
+    } catch {
+      /* uszkodzony plik – użyj syntezy */
+    }
+  }
+  playSynthIntro(ctx);
 }
 
 export default function IntroPlayer({
@@ -94,9 +123,9 @@ export default function IntroPlayer({
         const ctx = new Ctx();
         audioRef.current = ctx;
         if (ctx.state === "running") {
-          playIntroDrums(ctx);
+          playIntroSound(ctx);
         } else {
-          ctx.resume().then(() => playIntroDrums(ctx)).catch(() => {});
+          ctx.resume().then(() => playIntroSound(ctx)).catch(() => {});
         }
       }
     } catch {
@@ -121,7 +150,7 @@ export default function IntroPlayer({
   const unlockAudio = () => {
     const ctx = audioRef.current;
     if (ctx && ctx.state === "suspended") {
-      ctx.resume().then(() => playIntroDrums(ctx)).catch(() => {});
+      ctx.resume().then(() => playIntroSound(ctx)).catch(() => {});
     }
   };
 
@@ -145,19 +174,15 @@ export default function IntroPlayer({
             fading ? "opacity-0" : "opacity-100"
           }`}
         >
-          {/* ambient glow */}
-          <div className="intro-glow pointer-events-none absolute left-1/2 top-1/2 h-56 w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ph-orange/15 blur-3xl" />
-
-          {/* logo */}
-          <div className="intro-logo relative font-display text-5xl font-black tracking-tight sm:text-7xl">
+          <div
+            className="intro-logo flex items-center text-5xl font-bold leading-none tracking-tight sm:text-8xl"
+            style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+          >
             <span className="text-white">Pol</span>
-            <span className="ml-2 inline-block rounded-lg bg-ph-orange px-3 py-1 text-black sm:rounded-xl sm:px-4">
-              Hub
+            <span className="ml-[0.08em] rounded-[0.12em] bg-ph-orange px-[0.12em] pb-[0.1em] pt-[0.06em] text-black">
+              hub
             </span>
           </div>
-          <p className="intro-sub mt-4 text-xs font-semibold uppercase tracking-[0.4em] text-ph-muted sm:text-sm">
-            przedstawia
-          </p>
 
           {/* hint gdy audio zablokowane */}
           {started && (
