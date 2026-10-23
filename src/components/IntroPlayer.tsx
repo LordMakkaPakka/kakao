@@ -107,7 +107,7 @@ export default function IntroPlayer({
             preload="auto"
             onEnded={finishIntro}
             onError={finishIntro}
-            className="h-full w-full scale-[1.5] object-cover"
+            className="h-full w-full scale-[1.35] object-cover"
             aria-label="Intro Polhub"
           />
 
