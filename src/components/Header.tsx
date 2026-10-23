@@ -17,6 +17,7 @@ import {
   UserPlus,
   Film,
   ShieldCheck,
+  Settings,
 } from "lucide-react";
 
 export default function Header({
@@ -161,11 +162,18 @@ export default function Header({
                     </p>
                   </div>
                   <Link
+                    href={`/u/${encodeURIComponent(currentUser ?? "")}`}
+                    onClick={() => setUserOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-ph-dark"
+                  >
+                    <User className="h-4 w-4 text-ph-muted" /> Mój profil
+                  </Link>
+                  <Link
                     href="/account"
                     onClick={() => setUserOpen(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-ph-dark"
                   >
-                    <User className="h-4 w-4 text-ph-muted" /> Moje konto
+                    <Settings className="h-4 w-4 text-ph-muted" /> Moje konto
                   </Link>
                   <Link
                     href="/upload"

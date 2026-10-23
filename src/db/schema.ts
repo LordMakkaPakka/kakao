@@ -21,6 +21,8 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   avatar: text("avatar"), // data URL (zdjęcie profilowe)
+  /** Opis profilu widoczny publicznie na /u/<nick>. */
+  bio: text("bio"),
   /** Koniec bana; null = konto aktywne. */
   bannedUntil: timestamp("banned_until"),
   banReason: text("ban_reason"),

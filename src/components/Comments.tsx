@@ -24,8 +24,10 @@ function Avatar({ username, size = 40 }: { username: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   const style = { width: size, height: size };
   return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display font-black text-black"
+    <Link
+      href={`/u/${encodeURIComponent(username)}`}
+      title={`Profil ${username}`}
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display font-black text-black transition-opacity hover:opacity-85"
       style={{ ...style, fontSize: size * 0.42 }}
     >
       {broken ? (
@@ -41,7 +43,7 @@ function Avatar({ username, size = 40 }: { username: string; size?: number }) {
           className="h-full w-full object-cover"
         />
       )}
-    </span>
+    </Link>
   );
 }
 
@@ -380,7 +382,12 @@ export default function Comments({
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="flex items-center gap-1 font-display font-bold text-white">
-              {comment.username}
+              <Link
+                href={`/u/${encodeURIComponent(comment.username)}`}
+                className="transition-colors hover:text-ph-orange hover:underline"
+              >
+                {comment.username}
+              </Link>
               {comment.verified && (
                 <VerifiedBadge className="h-4 w-4" />
               )}

@@ -514,7 +514,12 @@ export default function AdminPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-1.5 font-display font-bold text-white">
-                        {a.username}
+                        <Link
+                          href={`/u/${encodeURIComponent(a.username)}`}
+                          className="transition-colors hover:text-ph-orange hover:underline"
+                        >
+                          {a.username}
+                        </Link>
                         {a.verified && <VerifiedBadge className="h-4 w-4" />}
                         {a.sensei && (
                           <span className="rounded bg-ph-orange px-1.5 py-0.5 text-[10px] font-black uppercase text-black">
