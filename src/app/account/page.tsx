@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Ban, Camera, Eye, Film, Loader2, Trash2 } from "lucide-react";
+import { Ban, Camera, Eye, Film, Loader2, PencilLine, Trash2 } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { authFetch } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -44,12 +44,27 @@ export default function AccountPage() {
   const [user, setUser] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
+  const [bio, setBio] = useState("");
+  const [savedBio, setSavedBio] = useState("");
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioInfo, setBioInfo] = useState<string | null>(null);
   const [ban, setBan] = useState<{ reason: string | null; remainingMs: number } | null>(null);
   const [list, setList] = useState<MyVideo[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    authFetch("/api/me", { cache: "no-store" })
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || typeof d.bio !== "string") return;
+        setBio(d.bio);
+        setSavedBio(d.bio);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     authFetch("/api/account/videos", { cache: "no-store" })
@@ -64,6 +79,32 @@ export default function AccountPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function saveBio() {
+    setBioBusy(true);
+    setError(null);
+    setBioInfo(null);
+    try {
+      const r = await authFetch("/api/account/bio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(d.error ?? "Nie udało się zapisać opisu.");
+        return;
+      }
+      const saved = typeof d.bio === "string" ? d.bio : "";
+      setBio(saved);
+      setSavedBio(saved);
+      setBioInfo("Opis profilu zapisany.");
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setBioBusy(false);
+    }
+  }
 
   async function saveAvatar(value: string | null) {
     setBusy(true);
@@ -171,6 +212,12 @@ export default function AccountPage() {
             >
               Zmień zdjęcie
             </button>
+            <Link
+              href={`/u/${encodeURIComponent(user)}`}
+              className="rounded-full border border-ph-border px-4 py-1.5 text-sm font-semibold text-white hover:border-ph-orange hover:text-ph-orange"
+            >
+              Mój profil
+            </Link>
             {avatar && (
               <button
                 onClick={() => saveAvatar(null)}
@@ -185,6 +232,50 @@ export default function AccountPage() {
       </div>
 
       {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+
+      {/* Opis profilu */}
+      <div className="mt-6 rounded-xl border border-ph-border bg-ph-dark p-5">
+        <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-white">
+          Opis <span className="text-ph-orange">profilu</span>
+        </h2>
+        <p className="mt-1 text-xs text-ph-muted">
+          Widoczny publicznie na Twoim profilu — powiedz, co wrzucasz i czego
+          mogą się spodziewać widzowie.
+        </p>
+        <textarea
+          value={bio}
+          onChange={(e) => setBio(e.target.value.slice(0, 600))}
+          rows={4}
+          maxLength={600}
+          placeholder="Np. Amatorskie filmy z mojego miasta. Nowości co tydzień."
+          className="mt-3 w-full resize-y rounded-lg border border-ph-border bg-black px-3 py-2 text-sm text-white placeholder-ph-muted outline-none transition-colors focus:border-ph-orange"
+        />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span
+            className={`text-xs ${
+              bio.length > 500 ? "text-ph-orange" : "text-ph-muted"
+            }`}
+          >
+            {bio.length}/600
+          </span>
+          <div className="flex items-center gap-2">
+            {bioInfo && <span className="text-xs text-green-400">{bioInfo}</span>}
+            <button
+              type="button"
+              onClick={saveBio}
+              disabled={bioBusy || bio === savedBio}
+              className="flex items-center gap-1.5 rounded-full bg-ph-orange px-4 py-1.5 text-sm font-bold text-black transition-colors hover:bg-ph-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bioBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PencilLine className="h-4 w-4" />
+              )}
+              Zapisz opis
+            </button>
+          </div>
+        </div>
+      </div>
 
       <h2 className="mb-4 mt-8 font-display text-lg font-extrabold text-white">
         Moje <span className="text-ph-orange">filmy</span>

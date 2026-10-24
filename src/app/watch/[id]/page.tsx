@@ -140,17 +140,25 @@ export default async function WatchPage({
             {/* Uploader + description */}
             <div className="mt-5 rounded-xl border border-ph-border bg-ph-dark p-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display text-lg font-black text-black">
+                <Link
+                  href={`/u/${encodeURIComponent(video.uploader)}`}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display text-lg font-black text-black"
+                >
                   {uploaderAvatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={uploaderAvatar} alt={video.uploader} className="h-full w-full object-cover" />
                   ) : (
                     video.uploader.charAt(0)
                   )}
-                </span>
+                </Link>
                 <div>
                   <p className="flex items-center gap-1.5 font-display font-bold text-white">
-                    {video.uploader}{" "}
+                    <Link
+                      href={`/u/${encodeURIComponent(video.uploader)}`}
+                      className="transition-colors hover:text-ph-orange hover:underline"
+                    >
+                      {video.uploader}
+                    </Link>{" "}
                     {verified && <VerifiedBadge className="h-4 w-4" />}
                   </p>
                   <p className="text-xs text-ph-muted">
