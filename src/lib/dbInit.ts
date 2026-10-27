@@ -97,6 +97,22 @@ export function ensureSchema(): Promise<void> {
         )
       `);
       await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id SERIAL PRIMARY KEY,
+          subscriber TEXT NOT NULL,
+          channel TEXT NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_pair_idx
+          ON subscriptions (subscriber, channel)
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS subscriptions_channel_idx
+          ON subscriptions (channel)
+      `);
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS admins (
           username TEXT PRIMARY KEY,
           granted_by TEXT,

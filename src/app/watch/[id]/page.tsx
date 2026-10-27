@@ -10,9 +10,11 @@ import IntroPlayer from "@/components/IntroPlayer";
 import CategoryBar from "@/components/CategoryBar";
 import Comments from "@/components/Comments";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import SubscribeButton from "@/components/SubscribeButton";
 import { formatViews, timeAgo } from "@/lib/format";
 import { ensureSchema } from "@/lib/dbInit";
 import { getSessionUser } from "@/lib/auth";
+import { getSubscribeState } from "@/lib/subscriptions";
 import { listComments } from "@/lib/comments";
 import { Eye, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
 
@@ -59,6 +61,7 @@ export default async function WatchPage({
 
   const viewer = await getSessionUser();
   const initialComments = await listComments(videoId, viewer);
+  const subscribe = await getSubscribeState(video.uploader, viewer);
 
   const related = await db
     .select({
@@ -165,9 +168,13 @@ export default async function WatchPage({
                     {verified ? "Zweryfikowany twórca PolHub" : "Twórca PolHub"}
                   </p>
                 </div>
-                <button className="ml-auto rounded-full bg-ph-orange px-5 py-2 text-sm font-bold text-black transition-all hover:bg-ph-orange-hover">
-                  Subskrybuj
-                </button>
+                <SubscribeButton
+                  channel={video.uploader}
+                  initialSubscribed={subscribe.subscribed}
+                  initialSubscribers={subscribe.subscribers}
+                  viewer={viewer}
+                  className="ml-auto"
+                />
               </div>
               {video.description && (
                 <p className="mt-4 whitespace-pre-wrap border-t border-ph-border pt-4 text-sm leading-relaxed text-ph-text">

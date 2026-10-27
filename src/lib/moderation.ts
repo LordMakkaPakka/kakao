@@ -17,6 +17,7 @@ import {
   isStaticVerified,
 } from "@/lib/verified";
 import { getVerifiedSet } from "@/lib/verification";
+import { removeAllSubscriptions } from "@/lib/subscriptions";
 import { durationToMs, formatCountdown } from "@/lib/banTime";
 
 export { BAN_UNITS, durationToMs, formatCountdown } from "@/lib/banTime";
@@ -362,6 +363,7 @@ export async function adminDeleteAccount(username: string): Promise<boolean> {
     .delete(verificationRevocations)
     .where(eq(verificationRevocations.username, username));
   await db.delete(admins).where(eq(admins.username, username));
+  await removeAllSubscriptions(username);
   await db.delete(users).where(eq(users.username, username));
   return true;
 }

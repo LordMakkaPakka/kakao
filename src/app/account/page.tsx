@@ -2,12 +2,27 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Ban, Camera, Eye, Film, Loader2, PencilLine, Trash2 } from "lucide-react";
+import {
+  Ban,
+  BellOff,
+  Camera,
+  Eye,
+  Film,
+  Loader2,
+  PencilLine,
+  Trash2,
+} from "lucide-react";
 import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { authFetch } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { formatViews, timeAgo } from "@/lib/format";
 import { formatCountdown } from "@/lib/banTime";
+
+type MySubscription = {
+  channel: string;
+  subscribers: number;
+  since: string;
+};
 
 type MyVideo = {
   id: number;
@@ -50,6 +65,9 @@ export default function AccountPage() {
   const [bioInfo, setBioInfo] = useState<string | null>(null);
   const [ban, setBan] = useState<{ reason: string | null; remainingMs: number } | null>(null);
   const [list, setList] = useState<MyVideo[]>([]);
+  const [subs, setSubs] = useState<MySubscription[]>([]);
+  const [subBusy, setSubBusy] = useState<string | null>(null);
+  const [subInfo, setSubInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +83,50 @@ export default function AccountPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    authFetch("/api/subscriptions", { cache: "no-store" })
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && Array.isArray(d.channels)) setSubs(d.channels);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function unsubscribe(channel: string) {
+    setSubBusy(channel);
+    setError(null);
+    setSubInfo(null);
+    try {
+      const r = await authFetch(
+        `/api/channels/${encodeURIComponent(channel)}/subscribe`,
+        { method: "POST" }
+      );
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(d.error ?? "Nie udało się odsubskrybować kanału.");
+        return;
+      }
+      if (d.subscribed === true) {
+        // Serwer nadal widzi subskrypcję (np. podwójne kliknięcie) – tylko odśwież licznik.
+        setSubs((prev) =>
+          prev.map((sub) =>
+            sub.channel === channel
+              ? { ...sub, subscribers: Number(d.subscribers) || sub.subscribers }
+              : sub
+          )
+        );
+        setSubInfo(`Kanał ${channel} jest nadal subskrybowany.`);
+        return;
+      }
+      setSubs((prev) => prev.filter((sub) => sub.channel !== channel));
+      setSubInfo(`Odsubskrybowano ${channel}.`);
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setSubBusy(null);
+    }
+  }
 
   useEffect(() => {
     authFetch("/api/account/videos", { cache: "no-store" })
@@ -275,6 +337,64 @@ export default function AccountPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Subskrypcje */}
+      <div className="mt-6 rounded-xl border border-ph-border bg-ph-dark p-5">
+        <h2 className="flex flex-wrap items-center gap-2 font-display text-lg font-extrabold text-white">
+          Moje <span className="text-ph-orange">subskrypcje</span>
+          <span className="rounded-full bg-ph-panel px-2 py-0.5 text-xs font-bold text-ph-muted">
+            {subs.length}
+          </span>
+        </h2>
+        {subInfo && <p className="mt-1 text-xs text-green-400">{subInfo}</p>}
+        {subs.length === 0 ? (
+          <p className="mt-2 text-sm text-ph-muted">
+            Nie subskrybujesz jeszcze żadnego kanału. Wejdź na profil twórcy i
+            kliknij „Subskrybuj”.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {subs.map((s) => (
+              <li
+                key={s.channel}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-ph-border bg-black/30 px-3 py-2"
+              >
+                <Link
+                  href={`/u/${encodeURIComponent(s.channel)}`}
+                  className="flex min-w-0 flex-1 items-center gap-2 font-semibold text-white transition-colors hover:text-ph-orange"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ph-orange font-display text-sm font-black text-black">
+                    {s.channel.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate">{s.channel}</span>
+                </Link>
+                <span className="text-xs text-ph-muted">
+                  {s.subscribers} {s.subscribers === 1 ? "subskrybent" : "subskrybentów"}
+                </span>
+                <Link
+                  href={`/u/${encodeURIComponent(s.channel)}`}
+                  className="rounded-full border border-ph-border px-3 py-1 text-xs font-semibold text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
+                >
+                  Profil
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => unsubscribe(s.channel)}
+                  disabled={subBusy === s.channel}
+                  className="flex items-center gap-1.5 rounded-full border border-ph-border px-3 py-1 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:opacity-60"
+                >
+                  {subBusy === s.channel ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <BellOff className="h-3.5 w-3.5" />
+                  )}
+                  Odsubskrybuj
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <h2 className="mb-4 mt-8 font-display text-lg font-extrabold text-white">
