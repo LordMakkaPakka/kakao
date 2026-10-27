@@ -118,6 +118,26 @@ export type VerificationRevocation =
   typeof verificationRevocations.$inferSelect;
 
 /**
+ * Subskrypcje kanałów: `subscriber` zasubskrybował kanał `channel`.
+ * Jedna osoba może zasubskrybować dany kanał tylko raz.
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    subscriber: text("subscriber").notNull(),
+    channel: text("channel").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("subscriptions_pair_idx").on(table.subscriber, table.channel),
+    index("subscriptions_channel_idx").on(table.channel),
+  ]
+);
+
+export type Subscription = typeof subscriptions.$inferSelect;
+
+/**
  * Administratorzy nadani przez sensei69. sensei69 jest adminem zawsze
  * (nie trzeba wpisu w tej tabeli).
  */

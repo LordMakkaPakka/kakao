@@ -10,11 +10,14 @@ import {
   PencilLine,
   ShieldCheck,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { getProfile } from "@/lib/profile";
 import { getSessionUser } from "@/lib/auth";
+import { getSubscribeState } from "@/lib/subscriptions";
 import VideoCard from "@/components/VideoCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import SubscribeButton from "@/components/SubscribeButton";
 import { formatViews } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +44,7 @@ export default async function ProfilePage({ params }: Props) {
   const viewer = await getSessionUser();
   const isMine =
     !!viewer && viewer.toLowerCase() === profile.username.toLowerCase();
+  const subscribe = await getSubscribeState(profile.username, viewer);
 
   const joined = profile.createdAt
     ? new Date(profile.createdAt).toLocaleDateString("pl-PL", {
@@ -102,6 +106,10 @@ export default async function ProfilePage({ params }: Props) {
                   <Film className="h-3.5 w-3.5" /> {profile.videos.length} filmów
                 </span>
                 <span className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" /> {subscribe.subscribers}{" "}
+                  {subscribe.subscribers === 1 ? "subskrybent" : "subskrybentów"}
+                </span>
+                <span className="flex items-center gap-1">
                   <Eye className="h-3.5 w-3.5" /> {formatViews(profile.totalViews)}{" "}
                   wyświetleń
                 </span>
@@ -112,14 +120,23 @@ export default async function ProfilePage({ params }: Props) {
               </p>
             </div>
 
-            {isMine && (
-              <Link
-                href="/account"
-                className="ml-auto flex items-center gap-2 rounded-full bg-ph-orange px-5 py-2 text-sm font-bold text-black transition-colors hover:bg-ph-orange-hover"
-              >
-                <PencilLine className="h-4 w-4" /> Edytuj profil
-              </Link>
-            )}
+            <div className="ml-auto flex flex-wrap items-center gap-2 pb-1">
+              <SubscribeButton
+                channel={profile.username}
+                initialSubscribed={subscribe.subscribed}
+                initialSubscribers={subscribe.subscribers}
+                viewer={viewer}
+                size="lg"
+              />
+              {isMine && (
+                <Link
+                  href="/account"
+                  className="flex items-center gap-2 rounded-full border border-ph-border px-5 py-2 text-sm font-semibold text-white transition-colors hover:border-ph-orange hover:text-ph-orange"
+                >
+                  <PencilLine className="h-4 w-4" /> Edytuj profil
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Opis */}
