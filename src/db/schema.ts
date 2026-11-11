@@ -42,6 +42,8 @@ export const videos = pgTable("videos", {
   fileSize: integer("file_size").notNull().default(0),
   durationSeconds: integer("duration_seconds").notNull().default(0),
   thumbnail: text("thumbnail"), // data URL captured client-side
+  /** Adres pliku w magazynie zewnętrznym (Vercel Blob); null = dane w `data`. */
+  fileUrl: text("file_url"),
   data: bytea("data").notNull(),
   views: integer("views").notNull().default(0),
   likes: integer("likes").notNull().default(0),
@@ -116,6 +118,40 @@ export const verificationRevocations = pgTable("verification_revocations", {
 
 export type VerificationRevocation =
   typeof verificationRevocations.$inferSelect;
+
+/**
+ * Trwające uploady (na Vercelu każdy fragment może trafić na inną instancję,
+ * więc nie da się ich trzymać w pamięci ani w /tmp).
+ */
+export const pendingUploads = pgTable("pending_uploads", {
+  id: text("id").primaryKey(),
+  user: text("user").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull().default("video/mp4"),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  category: text("category").notNull().default("Amatorskie"),
+  duration: integer("duration").notNull().default(0),
+  thumbnail: text("thumbnail"),
+  fileSize: integer("file_size").notNull(),
+  received: integer("received").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type PendingUploadRow = typeof pendingUploads.$inferSelect;
+
+/** Fragmenty pliku wysyłane kawałkami (4 MB), składane przy zakończeniu. */
+export const uploadParts = pgTable(
+  "upload_parts",
+  {
+    uploadId: text("upload_id").notNull(),
+    offset: integer("offset").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (table) => [uniqueIndex("upload_parts_pk").on(table.uploadId, table.offset)]
+);
+
+export type UploadPart = typeof uploadParts.$inferSelect;
 
 /**
  * Subskrypcje kanałów: `subscriber` zasubskrybował kanał `channel`.

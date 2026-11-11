@@ -18,6 +18,7 @@ import {
 } from "@/lib/verified";
 import { getVerifiedSet } from "@/lib/verification";
 import { removeAllSubscriptions } from "@/lib/subscriptions";
+import { deleteStoredVideo } from "@/lib/videoStorage";
 import { durationToMs, formatCountdown } from "@/lib/banTime";
 
 export { BAN_UNITS, durationToMs, formatCountdown } from "@/lib/banTime";
@@ -333,7 +334,10 @@ export async function adminDeleteVideo(id: number): Promise<boolean> {
   const deleted = await db
     .delete(videos)
     .where(eq(videos.id, id))
-    .returning({ id: videos.id });
+    .returning({ id: videos.id, fileUrl: videos.fileUrl });
+  if (deleted.length > 0) {
+    await deleteStoredVideo(deleted[0].fileUrl);
+  }
   return deleted.length > 0;
 }
 

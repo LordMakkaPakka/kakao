@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import { databaseInfo, db } from "@/db";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -27,6 +27,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let userVerified = false;
   let dbFailure: ReturnType<typeof classifyDbFailure> | null = null;
   try {
+    if (!databaseInfo().configured) {
+      throw new Error("Brak zmiennej z adresem bazy (DATABASE_URL / POSTGRES_URL).");
+    }
     // Szybka sonda: jeśli baza odrzuca nawet „select 1”, nie ma sensu
     // renderować podstron (skończyłoby się błędem 500).
     await db.execute(sql`select 1`);
