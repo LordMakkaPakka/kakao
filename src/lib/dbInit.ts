@@ -42,6 +42,9 @@ export function ensureSchema(): Promise<void> {
       await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`);
       await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
       await db.execute(
+        sql`ALTER TABLE videos ADD COLUMN IF NOT EXISTS file_url TEXT`
+      );
+      await db.execute(
         sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until TIMESTAMP`
       );
       await db.execute(
@@ -95,6 +98,33 @@ export function ensureSchema(): Promise<void> {
           revoked_by TEXT,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS pending_uploads (
+          id TEXT PRIMARY KEY,
+          "user" TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL DEFAULT 'video/mp4',
+          title TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          category TEXT NOT NULL DEFAULT 'Amatorskie',
+          duration INTEGER NOT NULL DEFAULT 0,
+          thumbnail TEXT,
+          file_size INTEGER NOT NULL,
+          received INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS upload_parts (
+          upload_id TEXT NOT NULL,
+          "offset" INTEGER NOT NULL,
+          data BYTEA NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS upload_parts_pk
+          ON upload_parts (upload_id, "offset")
       `);
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS subscriptions (

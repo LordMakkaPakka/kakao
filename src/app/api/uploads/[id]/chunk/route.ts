@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
-import { appendChunk, CHUNK_SIZE, pendingUploads } from "@/lib/uploadStore";
+import { appendChunk, CHUNK_SIZE, findPendingUpload } from "@/lib/uploadStore";
 
 export async function POST(
   req: NextRequest,
@@ -12,8 +12,8 @@ export async function POST(
   }
 
   const { id } = await ctx.params;
-  const upload = pendingUploads.get(id);
-  if (!upload || upload.user !== user) {
+  const upload = await findPendingUpload(id, user);
+  if (!upload) {
     return NextResponse.json(
       { error: "Nieznany upload. Zacznij przesyłanie od nowa." },
       { status: 404 }

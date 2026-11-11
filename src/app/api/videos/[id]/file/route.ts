@@ -14,12 +14,22 @@ export async function GET(
   }
 
   const [row] = await db
-    .select({ data: videos.data, mimeType: videos.mimeType })
+    .select({
+      data: videos.data,
+      mimeType: videos.mimeType,
+      fileUrl: videos.fileUrl,
+    })
     .from(videos)
     .where(eq(videos.id, videoId))
     .limit(1);
 
   if (!row) return new NextResponse("Not found", { status: 404 });
+
+  // Plik w magazynie zewnętrznym — odsyłamy przeglądarkę prosto do niego.
+  // Omija to limit 4,5 MB na odpowiedź funkcji serverless na Vercelu.
+  if (row.fileUrl) {
+    return NextResponse.redirect(row.fileUrl, 307);
+  }
 
   const buffer = row.data;
   const total = buffer.length;

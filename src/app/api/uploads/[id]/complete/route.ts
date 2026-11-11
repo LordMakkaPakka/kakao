@@ -4,7 +4,8 @@ import { videos } from "@/db/schema";
 import { getUserFromRequest } from "@/lib/auth";
 import { bannedResponse } from "@/lib/moderation";
 import { ensureSchema } from "@/lib/dbInit";
-import { finalizeUpload, pendingUploads } from "@/lib/uploadStore";
+import { finalizeUpload, findPendingUpload } from "@/lib/uploadStore";
+import { storeVideo } from "@/lib/videoStorage";
 
 export async function POST(
   req: NextRequest,
@@ -20,8 +21,8 @@ export async function POST(
   if (blocked) return blocked;
 
   const { id } = await ctx.params;
-  const upload = pendingUploads.get(id);
-  if (!upload || upload.user !== user) {
+  const upload = await findPendingUpload(id, user);
+  if (!upload) {
     return NextResponse.json(
       { error: "Nieznany upload. Zacznij przesyłanie od nowa." },
       { status: 404 }
@@ -39,6 +40,13 @@ export async function POST(
   }
 
   const buffer = await finalizeUpload(upload);
+  // Duże filmy idą do magazynu (Vercel Blob), gdy jest skonfigurowany;
+  // w przeciwnym razie lądują w bazie, jak dotychczas.
+  const stored = await storeVideo(buffer, {
+    uploadId: upload.id,
+    fileName: upload.fileName,
+    mimeType: upload.mimeType,
+  });
 
   const [row] = await db
     .insert(videos)
@@ -52,9 +60,10 @@ export async function POST(
       fileSize: upload.fileSize,
       durationSeconds: upload.duration,
       thumbnail: upload.thumbnail,
-      data: buffer,
+      fileUrl: stored.fileUrl,
+      data: stored.data,
     })
     .returning({ id: videos.id });
 
-  return NextResponse.json({ ok: true, id: row.id });
+  return NextResponse.json({ ok: true, id: row.id, storage: stored.storage });
 }
