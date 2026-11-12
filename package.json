@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wipe": "node scripts/wipe-site.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.9.0",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
 import { appendChunk, CHUNK_SIZE, findPendingUpload } from "@/lib/uploadStore";
+import { bannedResponse } from "@/lib/moderation";
 
 export async function POST(
   req: NextRequest,
@@ -10,6 +11,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Brak sesji." }, { status: 401 });
   }
+
+  const blocked = await bannedResponse(user);
+  if (blocked) return blocked;
 
   const { id } = await ctx.params;
   const upload = await findPendingUpload(id, user);

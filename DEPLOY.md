@@ -48,7 +48,29 @@ Fragmenty wysyłanego pliku są tymczasowo trzymane w tabelach
 inną instancję, więc pamięć i `/tmp` nie wystarczą). Po zakończeniu uploadu
 wpisy są usuwane, a porzucone — po 2 godzinach.
 
-## 4. Diagnostyka zajętości bazy
+## 4. Czyszczenie serwisu (wszystkie konta i filmy)
+
+Dwie drogi — obie usuwają **wszystkie** konta (także `sensei69`), filmy,
+komentarze, subskrypcje, odznaki, bany, nadanych adminów i niedokończone
+uploady. Strona i kod zostają.
+
+**Z panelu (najprościej):** zaloguj się na `sensei69` → `/admin` → na dole
+sekcji „Wyczyść cały serwis” → potwierdź. Po czyszczeniu zarejestruj
+`sensei69` ponownie (uprawnienia ma z definicji, nie z bazy).
+
+**Z terminala:**
+
+```bash
+DATABASE_URL="postgresql://..." pnpm wipe          # pokazuje, co zniknie
+DATABASE_URL="postgresql://..." pnpm wipe --yes    # czyści
+```
+
+Czyszczenie odzyskuje też miejsce na dysku (`vacuum full`), więc po nim
+zużycie limitu bazy wyraźnie spada. Jeśli filmy leżą w Vercel Blob, ustaw
+`BLOB_READ_WRITE_TOKEN`, żeby skrypt usunął też pliki (panel robi to zawsze,
+gdy token jest skonfigurowany).
+
+## 5. Diagnostyka zajętości bazy
 
 ```bash
 DATABASE_URL="postgresql://..." node scripts/db-usage.mjs
@@ -57,7 +79,7 @@ DATABASE_URL="postgresql://..." node scripts/db-usage.mjs
 Skrypt pokazuje rozmiar bazy, największe tabele i najcięższe filmy (czyli co
 zwolnić, gdy baza się zapełnia).
 
-## 5. Najczęstsze problemy
+## 6. Najczęstsze problemy
 
 | Objaw | Przyczyna | Rozwiązanie |
 |---|---|---|
@@ -66,3 +88,4 @@ zwolnić, gdy baza się zapełnia).
 | „Brak połączenia z bazą” | zły adres, baza uśpiona, brak SSL | sprawdź `/api/health`, dopisz `?sslmode=require` |
 | Film się nie odtwarza (duży plik) | limit 4,5 MB odpowiedzi funkcji | włącz Vercel Blob (`BLOB_READ_WRITE_TOKEN`) |
 | „Nieznany upload” przy wysyłaniu | stara wersja kodu (pamięć zamiast bazy) | wdróż aktualną wersję — uploady są w bazie |
+| „To konto już nie istnieje” | konto usunięte / serwis wyczyszczony, a stara sesja została w przeglądarce | wyloguj się i zaloguj ponownie |

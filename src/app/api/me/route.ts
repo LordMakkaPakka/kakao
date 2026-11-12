@@ -33,6 +33,22 @@ export async function GET(req: NextRequest) {
       .where(eq(users.username, user))
       .limit(1),
   ]);
+  // Konto mogło zostać usunięte (także przez wyczyszczenie serwisu) —
+  // wtedy token nie może udawać, że ktoś jest zalogowany.
+  if (!ban.exists) {
+    return NextResponse.json({
+      user: null,
+      verified: false,
+      sensei: false,
+      admin: false,
+      bio: null,
+      bannedUntil: null,
+      banReason: null,
+      remainingMs: 0,
+      gone: true,
+    });
+  }
+
   return NextResponse.json({
     user,
     verified,

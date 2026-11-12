@@ -95,6 +95,8 @@ export async function revokeAdmin(username: string): Promise<void> {
 }
 
 export type BanState = {
+  /** Czy konto istnieje w bazie (po usunięciu konta sesja jest martwa). */
+  exists: boolean;
   banned: boolean;
   until: string | null;
   reason: string | null;
@@ -111,6 +113,7 @@ export async function getBanState(username: string): Promise<BanState> {
   const until = row?.bannedUntil ?? null;
   const remainingMs = until ? until.getTime() - Date.now() : 0;
   return {
+    exists: !!row,
     banned: !!until && remainingMs > 0,
     until: until ? until.toISOString() : null,
     reason: row?.reason ?? null,
@@ -133,12 +136,22 @@ export function banMessage(state: BanState): string {
   }`;
 }
 
-/** Odpowiedź 403, gdy konto ma aktywnego bana (albo null, gdy może działać). */
+/**
+ * Odpowiedź 403, gdy konto ma aktywnego bana (albo null, gdy może działać).
+ * Zwraca też 401, gdy konto z tokenu już nie istnieje — inaczej po usunięciu
+ * konta (lub wyczyszczeniu serwisu) stara sesja dalej by działała.
+ */
 export async function bannedResponse(
   username: string | null | undefined
 ): Promise<NextResponse | null> {
   if (!username) return null;
   const state = await getBanState(username);
+  if (!state.exists) {
+    return NextResponse.json(
+      { error: "To konto już nie istnieje. Zaloguj się ponownie.", gone: true },
+      { status: 401 }
+    );
+  }
   if (!state.banned) return null;
   return NextResponse.json(
     { error: `Konto jest ${banMessage(state)}`, banned: true },
