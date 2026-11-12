@@ -14,11 +14,12 @@ import {
   MessageSquare,
   Search,
   ShieldCheck,
+  Trash2,
   Unlock,
   UserRoundX,
   Users,
 } from "lucide-react";
-import { authFetch, fetchMeInfo } from "@/lib/clientAuth";
+import { authFetch, clearToken, fetchMeInfo } from "@/lib/clientAuth";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import ConfirmDeleteButton from "@/components/ConfirmDeleteButton";
 import { timeAgo } from "@/lib/format";
@@ -274,6 +275,43 @@ export default function AdminPage() {
         c.videoTitle.toLowerCase().includes(q)
     );
   }, [comments, query]);
+
+  async function wipeEverything() {
+    setBusy("wipe");
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await authFetch("/api/admin/wipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "WYCZYŚĆ" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się wyczyścić serwisu.");
+        return;
+      }
+      // Konto sensei69 też zostało usunięte — sesja jest już nieważna,
+      // więc czyścimy ją lokalnie i pokazujemy podsumowanie bez przeładowania
+      // (inaczej panel przeskoczyłby na ekran „brak uprawnień”).
+      clearToken();
+      setAccounts([]);
+      setVideos([]);
+      setComments([]);
+      setActiveBans(0);
+      setAdminCount(0);
+      setQuery("");
+      setInfo(
+        `Wyczyszczono serwis: ${data.users} kont, ${data.videos} filmów, ` +
+          `${data.comments} komentarzy. Baza: ${data.sizeBeforeMb} → ${data.sizeAfterMb}. ` +
+          "Zarejestruj konto sensei69 od nowa, żeby wrócić do panelu."
+      );
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function deleteContent(type: "video" | "comment" | "account", id: string | number, label: string) {
     setBusy(`${type}-${id}`);
@@ -755,6 +793,31 @@ export default function AdminPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {/* CZYSZCZENIE SERWISU – tylko sensei69 */}
+        {iamSensei && (
+          <div className="mt-6 rounded-xl border border-red-400/40 bg-red-500/5 p-4">
+            <h2 className="flex items-center gap-2 font-display text-lg font-black text-white">
+              <Trash2 className="h-5 w-5 text-red-400" />
+              Wyczyść cały serwis
+            </h2>
+            <p className="mt-1 text-sm text-ph-muted">
+              Usuwa <strong className="text-white">wszystkie konta</strong>{" "}
+              (razem z sensei69), filmy, komentarze, subskrypcje, odznaki, bany
+              i niedokończone wysyłki. Strona zostaje, dane znikają — po
+              czyszczeniu zarejestruj sensei69 ponownie.
+            </p>
+            <div className="mt-3">
+              <ConfirmDeleteButton
+                label="Wyczyść serwis"
+                question="Usunąć wszystkie konta i filmy?"
+                hint="Tego nie da się cofnąć. Po czyszczeniu zarejestruj sensei69 od nowa."
+                busy={busy === "wipe"}
+                onConfirm={wipeEverything}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
