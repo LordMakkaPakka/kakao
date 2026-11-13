@@ -4,6 +4,26 @@ PolHub działa jako **Cloudflare Worker** (Next.js przez adapter OpenNext).
 Baza to Postgres (np. Neon) dostępny przez **Cloudflare Hyperdrive**, a filmy
 są **wyłącznie embedami** — PolHub nie przyjmuje plików wideo.
 
+## 0. Szybka ścieżka (3 kroki)
+
+```bash
+npx wrangler login                                   # 1. zaloguj CLI
+npx wrangler hyperdrive create polhub-db \
+  --connection-string="postgresql://..."             # 2. utwórz Hyperdrive
+# 3. wklej wypisane id do wrangler.jsonc i sprawdź: pnpm cf:doctor
+```
+
+Potem albo `pnpm deploy` z terminala, albo podłączenie repozytorium do
+Workers Builds (sekcja 1e). Konfigurację zawsze możesz sprawdzić bez
+wdrażania:
+
+```bash
+pnpm cf:doctor
+```
+
+Skrypt mówi wprost, czego brakuje (placeholder `id` Hyperdrive, zła nazwa
+bindingu, brak `nodejs_compat`, zła komenda builda).
+
 ## 1. Jednorazowa konfiguracja
 
 ### a) Zaloguj wrangler do Cloudflare
@@ -19,15 +39,34 @@ npx wrangler hyperdrive create polhub-db \
   --connection-string="postgresql://user:haslo@host/baza?sslmode=require"
 ```
 
-Wypisze `id`. Wklej je do `wrangler.jsonc` w miejsce `WSTAW_ID_HYPERDRIVE`:
+Skąd wziąć connection string (Neon): panel projektu → **Connect** → zakładka
+*Connection string* → wybierz „Pooled connection” i skopiuj adres (zawiera
+`?sslmode=require`). Hasło z adresu musi być zakodowane, jeśli ma znaki
+specjalne (`@` → `%40`, `#` → `%23`).
+
+Polecenie wypisze blok JSON z `id`. Wklej je do `wrangler.jsonc` w miejsce
+`WSTAW_ID_HYPERDRIVE`:
 
 ```jsonc
 "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "twoje-id" }]
 ```
 
 > Hyperdrive trzyma pulę połączeń po swojej stronie, więc baza nie dostaje
-> setek połączeń z każdej instancji Workera. Adres z `--connection-string`
-> to zwykły adres Postgresa (z Neon: connection string z panelem „Connect”).
+> setek połączeń z każdej instancji Workera.
+
+Przydatne komendy:
+
+```bash
+npx wrangler hyperdrive list                 # id wszystkich konfiguracji
+npx wrangler hyperdrive get <id>             # szczegóły jednej
+npx wrangler hyperdrive update <id> \
+  --connection-string="postgresql://..."     # zmiana bazy (np. po resecie hasła)
+npx wrangler hyperdrive delete <id>          # usunięcie
+```
+
+Ten sam efekt w panelu: **Cloudflare → Storage & Databases → Hyperdrive →
+Create configuration** — tam też zobaczysz `id` („Configuration ID”) i
+możesz podmienić connection string bez terminala.
 
 ### c) Sekrety (opcjonalne)
 
@@ -46,6 +85,27 @@ pnpm preview     # lokalny podgląd w workerd (z bazą z Hyperdrive)
 Pierwsze wdrożenie utworzy Workera `polhub` pod adresem
 `https://polhub.<twoje-konto>.workers.dev`. Własną domenę dodasz w
 **Workers & Pages → polhub → Settings → Domains & Routes**.
+
+### e) Deployment z GitHuba (Workers Builds)
+
+W panelu Cloudflare: **Workers & Pages → polhub → Settings → Build**.
+
+| Pole | Wartość |
+|---|---|
+| Build command | `pnpm run build` |
+| Deploy command | `npx wrangler deploy` |
+
+`pnpm run build` robi teraz **build OpenNext** (a nie samo `next build`), więc
+powstaje katalog `.open-next/`, którego wymaga deploy. Sam Next.js jest pod
+`pnpm build:next` — OpenNext wywołuje go wewnętrznie (patrz
+`open-next.config.ts`, pole `buildCommand`).
+
+Częsty błąd: build ustawiony na `next build`, a deploy na `wrangler deploy` →
+`ERROR Could not find compiled Open Next config, did you run the build command?`
+Rozwiązanie: ustaw build command jak wyżej i kliknij **Retry deployment**.
+
+Sekrety dodaj w **Settings → Variables and Secrets** (typ *Secret*), nie w
+`wrangler.jsonc` — plik trafia do repozytorium.
 
 ## 2. Sprawdzenie po wdrożeniu
 
@@ -97,6 +157,17 @@ Bramka włącza się sama, gdy ustawisz `TELEGRAM_BOT_TOKEN`
 1. Użytkownik klika „napisz do bota” i wysyła `/start`.
 2. Bot odpowiada 6-znakowym kodem (ważny 15 minut, jednorazowy).
 3. Kod wpisuje na stronie — konto zostaje odblokowane.
+
+Kolejność ustawiania bota:
+
+1. Telegram → **@BotFather** → `/newbot` → nazwa → nazwa użytkownika kończąca
+   się na `bot`. BotFather odpisze **tokenem** (format `123456:AAH…`).
+2. W Cloudflare: **Settings → Variables and Secrets → Add** →
+   *Secret* o nazwie `TELEGRAM_BOT_TOKEN`, wartość = token → **Deploy**.
+   (Z terminala: `npx wrangler secret put TELEGRAM_BOT_TOKEN`.)
+3. Wejdź na `/watch/<dowolny film>` lub `/upload` — pojawi się ekran
+   „Odblokuj dostęp kodem z Telegrama” z linkiem do bota.
+4. Wyślij botowi `/start` → dostaniesz 6-znakowy kod → wpisz go na stronie.
 
 `sensei69` i admini są zawsze przepuszczani. `sensei69` może **odebrać dostęp**
 w panelu (`/admin` → konto → „Odbierz dostęp TG”) — wtedy trzeba napisać do
