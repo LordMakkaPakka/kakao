@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 /**
  * Odbieranie wiadomości z Telegrama.
  *
- * Wywoływane przez cron (Vercel → `vercel.json`) oraz doraźnie — serwer sam
- * odbiera wiadomości także przy wpisywaniu kodu, więc użytkownik nie czeka
- * na harmonogram. Gdy ustawisz `CRON_SECRET`, endpoint przyjmie tylko
- * żądania z tym nagłówkiem (lub od samego Vercela).
+ * Wywoływane przez Cron Trigger w Cloudflare (patrz `wrangler.jsonc`) oraz
+ * doraźnie — ekran blokady sam prosi serwer o odebranie wiadomości, więc
+ * użytkownik nie czeka na harmonogram. Gdy ustawisz `CRON_SECRET`, endpoint
+ * przyjmie tylko żądania z tym nagłówkiem.
  */
 async function handle(req: NextRequest) {
   if (!telegramConfigured()) {
@@ -18,12 +18,8 @@ async function handle(req: NextRequest) {
   }
 
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    const isCron = req.headers.get("x-vercel-cron") === "1";
-    if (!isCron && auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Brak dostępu." }, { status: 401 });
-    }
+  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Brak dostępu." }, { status: 401 });
   }
 
   await ensureSchema();

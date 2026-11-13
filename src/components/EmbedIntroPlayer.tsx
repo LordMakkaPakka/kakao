@@ -1,8 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SkipForward, Volume2, VolumeX, Play, Loader2, ExternalLink } from "lucide-react";
+import {
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Play,
+  Loader2,
+  ExternalLink,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 import { formatDuration } from "@/lib/format";
+import { PolHubTopBar, PolHubWatermark } from "@/components/PolHubChrome";
 
 /**
  * Odtwarzacz dla filmów wklejonych jako embed.
@@ -19,14 +29,18 @@ export default function EmbedIntroPlayer({
   embedUrl,
   provider,
   title,
+  uploader,
   poster,
 }: {
   embedUrl: string;
   provider?: string;
   title: string;
+  uploader?: string;
   poster?: string | null;
 }) {
   const introRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [phase, setPhase] = useState<"intro" | "embed">("intro");
   const [introMounted, setIntroMounted] = useState(true);
   const [introFading, setIntroFading] = useState(false);
@@ -86,8 +100,29 @@ export default function EmbedIntroPlayer({
   const progress =
     introDuration > 0 ? Math.min(1, Math.max(0, introTime / introDuration)) : 0;
 
+  // Pełny ekran obejmuje całą ramkę PolHub (pasek + obraz), nie sam iframe —
+  // dzięki temu znak serwisu zostaje na obrazie także w fullscreenie.
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+      return;
+    }
+    frameRef.current?.requestFullscreen?.().catch(() => {});
+  }, []);
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-ph-border bg-black">
+    <div
+      ref={frameRef}
+      className="group/frame relative overflow-hidden rounded-xl border border-ph-border bg-black shadow-[0_10px_40px_rgba(0,0,0,0.55)]"
+    >
+      <PolHubTopBar title={title} provider={provider} uploader={uploader} />
+
       <div className="relative aspect-video w-full">
         {phase === "intro" && introMounted && !introBroken && (
           <video
@@ -107,6 +142,17 @@ export default function EmbedIntroPlayer({
               introFading ? "opacity-0" : "opacity-100"
             }`}
           />
+        )}
+
+        {/* Znak PolHub nad obrazem — także w pełnym ekranie */}
+        {phase === "embed" && (
+          <PolHubWatermark
+            className="absolute right-2 top-2 z-30 opacity-70 transition-opacity group-hover/frame:opacity-100"
+          />
+        )}
+
+        {phase === "intro" && !introBroken && (
+          <PolHubWatermark size="lg" className="absolute left-3 top-3 z-30" />
         )}
 
         {phase === "embed" && (
@@ -185,18 +231,34 @@ export default function EmbedIntroPlayer({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ph-border bg-ph-dark px-3 py-2 text-[11px] text-ph-muted">
-        <span>
-          Intro PolHub → film z {provider || "zewnętrznego serwisu"}
+      {/* Dolny pasek ramki — przyciski PolHub */}
+      <div className="flex items-center gap-2 border-t border-ph-border bg-ph-dark px-3 py-1.5 text-[11px] text-ph-muted">
+        <span className="min-w-0 flex-1 truncate">
+          {phase === "intro"
+            ? "Intro PolHub"
+            : `Film z ${provider || "zewnętrznego serwisu"} · ramka PolHub`}
         </span>
         <a
-          href={embedUrl}
+          href={embedUrl.replace("/embed/", "/watch?v=")}
           target="_blank"
           rel="noreferrer noopener"
-          className="flex items-center gap-1 transition-colors hover:text-ph-orange"
+          title="Otwórz u źródła (gdy serwis blokuje osadzanie)"
+          className="flex items-center gap-1 rounded px-1.5 py-1 transition-colors hover:text-ph-orange"
         >
-          Otwórz w serwisie źródłowym <ExternalLink className="h-3 w-3" />
+          <ExternalLink className="h-3.5 w-3.5" />
         </a>
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          aria-label={fullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+          className="flex items-center gap-1 rounded px-1.5 py-1 transition-colors hover:text-ph-orange"
+        >
+          {fullscreen ? (
+            <Minimize className="h-3.5 w-3.5" />
+          ) : (
+            <Maximize className="h-3.5 w-3.5" />
+          )}
+        </button>
       </div>
     </div>
   );

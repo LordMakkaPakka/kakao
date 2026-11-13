@@ -279,6 +279,29 @@ export default function AdminPage() {
     );
   }, [comments, query]);
 
+  async function purgeFiles() {
+    setBusy("purge-files");
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await authFetch("/api/admin/purge-files", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się usunąć starych plików.");
+        return;
+      }
+      setInfo(
+        `Usunięto ${data.deleted} film(ów) wgranych jako plik. ` +
+          `Baza: ${data.sizeBeforeMb} → ${data.sizeAfterMb}.`
+      );
+      await load();
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function wipeEverything() {
     setBusy("wipe");
     setError(null);
@@ -850,6 +873,30 @@ export default function AdminPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {/* STARE PLIKI – tylko sensei69 */}
+        {iamSensei && (
+          <div className="mt-6 rounded-xl border border-ph-border bg-ph-panel p-4">
+            <h2 className="flex items-center gap-2 font-display text-lg font-black text-white">
+              <Film className="h-5 w-5 text-ph-orange" />
+              Stare filmy wgrane jako plik
+            </h2>
+            <p className="mt-1 text-sm text-ph-muted">
+              Nowe filmy dodajemy tylko przez embed. Ten przycisk usuwa wpisy
+              wgrane jako plik (razem z danymi wideo) i odzyskuje miejsce w bazie.
+            </p>
+            <div className="mt-3">
+              <ConfirmDeleteButton
+                label="Usuń stare pliki"
+                question="Usunąć wszystkie filmy wgrane jako plik?"
+                hint="Zostaną tylko filmy z embedem. Tego nie da się cofnąć."
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                busy={busy === "purge-files"}
+                onConfirm={purgeFiles}
+              />
+            </div>
+          </div>
         )}
 
         {/* CZYSZCZENIE SERWISU – tylko sensei69 */}

@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ensureSchema } from "@/lib/dbInit";
-import { deleteStoredVideo } from "@/lib/videoStorage";
 
 /**
  * Czyszczenie serwisu: usuwa wszystkie filmy, komentarze, konta i wszystko,
@@ -42,14 +41,6 @@ async function databaseSize(): Promise<string> {
   return res.rows[0]?.pretty ?? "?";
 }
 
-/** Adresy filmów w magazynie zewnętrznym — trzeba je usunąć osobno. */
-async function externalVideoUrls(): Promise<string[]> {
-  const res = await db.execute<{ file_url: string | null }>(
-    sql`select file_url from videos where file_url is not null`
-  );
-  return res.rows.map((r) => r.file_url).filter((url): url is string => !!url);
-}
-
 /**
  * Czyści cały serwis. Kolejność ma znaczenie tylko dla czytelności —
  * klucze obce mają `on delete cascade`, ale i tak czyścimy wszystko jawnie.
@@ -59,7 +50,6 @@ export async function wipeSite(): Promise<WipeSummary> {
 
   const sizeBeforeMb = await databaseSize();
 
-  const urls = await externalVideoUrls();
   const videos = await count("videos");
   const comments = await count("comments");
   const users = await count("users");
@@ -67,12 +57,6 @@ export async function wipeSite(): Promise<WipeSummary> {
   const verifications = await count("verifications");
   const admins = await count("admins");
   const uploads = await count("pending_uploads");
-
-  // Magazyn plików (Vercel Blob) sprzątamy przed usunięciem wierszy,
-  // bo po nich nie byłoby już skąd wziąć adresów.
-  for (const url of urls) {
-    await deleteStoredVideo(url);
-  }
 
   const tables = [
     "comment_votes",
