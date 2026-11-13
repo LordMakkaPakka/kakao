@@ -18,12 +18,21 @@ export async function GET(
       data: videos.data,
       mimeType: videos.mimeType,
       fileUrl: videos.fileUrl,
+      embedUrl: videos.embedUrl,
     })
     .from(videos)
     .where(eq(videos.id, videoId))
     .limit(1);
 
   if (!row) return new NextResponse("Not found", { status: 404 });
+
+  // Film jest embedem — nie mamy pliku, którego można strumieniować.
+  if (row.embedUrl) {
+    return NextResponse.json(
+      { error: "Ten film jest osadzony z zewnętrznego serwisu." },
+      { status: 409 }
+    );
+  }
 
   // Plik w magazynie zewnętrznym — odsyłamy przeglądarkę prosto do niego.
   // Omija to limit 4,5 MB na odpowiedź funkcji serverless na Vercelu.

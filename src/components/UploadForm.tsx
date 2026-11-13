@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
+  Link2,
+  UploadCloud as UploadCloudIcon,
 } from "lucide-react";
 import { CATEGORIES, formatDuration } from "@/lib/format";
 import { authFetch } from "@/lib/clientAuth";
@@ -99,6 +101,10 @@ export default function UploadForm() {
   const [sentBytes, setSentBytes] = useState<number | null>(null);
   const [phase, setPhase] = useState<"idle" | "sending" | "saving">("idle");
   const [success, setSuccess] = useState(false);
+  // "file" = wrzucamy plik na PolHub, "embed" = film leży na zewnętrznym serwisie.
+  const [mode, setMode] = useState<"file" | "embed">("file");
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [savedAs, setSavedAs] = useState<"file" | "embed">("file");
 
   const uploading = phase !== "idle";
   const progress =
@@ -135,13 +141,51 @@ export default function UploadForm() {
     e.target.value = "";
   }
 
+  // Dodanie filmu przez embed — bez wysyłania pliku.
+  async function submitEmbed() {
+    setPhase("saving");
+    try {
+      const res = await authFetch("/api/videos/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embedUrl,
+          title: title.trim(),
+          description: description.trim(),
+          category,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) setAuthError(true);
+        throw new Error(data.error ?? "Nie udało się dodać filmu.");
+      }
+      setSavedAs("embed");
+      setSuccess(true);
+      setTimeout(() => {
+        router.push(`/watch/${data.id}`);
+        router.refresh();
+      }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nie udało się dodać filmu.");
+      setPhase("idle");
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setAuthError(false);
-    if (!file) return setError("Najpierw wybierz plik wideo.");
-    if (!title.trim()) return setError("Podaj tytuł filmu.");
     if (uploading) return;
+    if (!title.trim()) return setError("Podaj tytuł filmu.");
+
+    if (mode === "embed") {
+      if (!embedUrl.trim()) return setError("Wklej adres filmu albo kod iframe.");
+      await submitEmbed();
+      return;
+    }
+
+    if (!file) return setError("Najpierw wybierz plik wideo.");
 
     setPhase("sending");
     setSentBytes(0);
@@ -231,9 +275,13 @@ export default function UploadForm() {
     return (
       <div className="animate-fade-up rounded-2xl border border-green-500/40 bg-green-500/10 p-12 text-center">
         <CheckCircle2 className="mx-auto h-14 w-14 text-green-400" />
-        <h2 className="mt-4 font-display text-2xl font-black text-white">Film wrzucony!</h2>
+        <h2 className="mt-4 font-display text-2xl font-black text-white">
+          {savedAs === "embed" ? "Film dodany!" : "Film wrzucony!"}
+        </h2>
         <p className="mt-2 text-sm text-ph-muted">
-          Intro PolHub dodane automatycznie 🥁 Zaraz obejrzysz swój film…
+          {savedAs === "embed"
+            ? "Intro PolHub zagra przed embedem 🥁 Zaraz obejrzysz swój film…"
+            : "Intro PolHub dodane automatycznie 🥁 Zaraz obejrzysz swój film…"}
         </p>
       </div>
     );
@@ -241,8 +289,72 @@ export default function UploadForm() {
 
   return (
     <form onSubmit={onSubmit} className="animate-fade-up space-y-6">
+      {/* Wybór: plik czy embed */}
+      <div className="grid gap-2 rounded-2xl border border-ph-border bg-ph-dark p-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setMode("file")}
+          disabled={uploading}
+          className={`flex items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
+            mode === "file" ? "bg-ph-orange text-black" : "text-ph-muted hover:bg-ph-panel"
+          }`}
+        >
+          <UploadCloudIcon className="mt-0.5 h-5 w-5 shrink-0" />
+          <span>
+            <span className="block font-display text-sm font-black uppercase tracking-wide">
+              Wrzuć plik
+            </span>
+            <span className={`block text-xs ${mode === "file" ? "text-black/70" : ""}`}>
+              Film trzymany na PolHubie, do 200 MB
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("embed")}
+          disabled={uploading}
+          className={`flex items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
+            mode === "embed" ? "bg-ph-orange text-black" : "text-ph-muted hover:bg-ph-panel"
+          }`}
+        >
+          <Link2 className="mt-0.5 h-5 w-5 shrink-0" />
+          <span>
+            <span className="block font-display text-sm font-black uppercase tracking-wide">
+              Wklej embed
+            </span>
+            <span className={`block text-xs ${mode === "embed" ? "text-black/70" : ""}`}>
+              Film leży na zewnętrznym serwisie
+            </span>
+          </span>
+        </button>
+      </div>
+
+      {/* Pole na embed */}
+      {mode === "embed" && (
+        <div className="space-y-3 rounded-2xl border border-ph-border bg-ph-dark p-6">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ph-muted">
+              Adres filmu albo kod &lt;iframe&gt; *
+            </span>
+            <textarea
+              value={embedUrl}
+              onChange={(e) => setEmbedUrl(e.target.value)}
+              rows={3}
+              placeholder={'https://www.youtube.com/watch?v=…  •  https://streamable.com/e/…  •  <iframe src="…"></iframe>'}
+              className="w-full resize-none rounded-lg border border-ph-border bg-ph-black px-3 py-3 text-sm text-white placeholder-ph-muted outline-none transition-colors focus:border-ph-orange"
+            />
+          </label>
+          <p className="rounded-lg border border-ph-border bg-ph-black px-3 py-2 text-xs leading-relaxed text-ph-muted">
+            Obsługujemy YouTube, Vimeo, Dailymotion, Streamable i inne serwisy
+            pozwalające na osadzanie. <strong className="text-white">Intro PolHub
+            nadal leci</strong> — odtwarzacz PolHub gra je przed embedem.
+            Plik zostaje u tamtego serwisu, więc nie zajmuje miejsca w naszej bazie.
+          </p>
+        </div>
+      )}
+
       {/* Dropzone */}
-      {!file ? (
+      {mode === "file" && (!file ? (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -305,7 +417,7 @@ export default function UploadForm() {
             </button>
           )}
         </div>
-      )}
+      ))}
       <input
         ref={inputRef}
         type="file"
@@ -404,6 +516,10 @@ export default function UploadForm() {
           <>
             <Loader2 className="h-5 w-5 animate-spin" />
             {phase === "saving" ? "Zapisywanie…" : "Wysyłanie na PolHub…"}
+          </>
+        ) : mode === "embed" ? (
+          <>
+            <Link2 className="h-5 w-5" /> Dodaj embed
           </>
         ) : (
           <>

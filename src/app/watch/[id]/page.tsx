@@ -7,6 +7,8 @@ import { getVerifiedSet } from "@/lib/verification";
 import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
 import IntroPlayer from "@/components/IntroPlayer";
+import EmbedIntroPlayer from "@/components/EmbedIntroPlayer";
+import TelegramGate from "@/components/TelegramGate";
 import CategoryBar from "@/components/CategoryBar";
 import Comments from "@/components/Comments";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -14,6 +16,7 @@ import SubscribeButton from "@/components/SubscribeButton";
 import { formatViews, timeAgo } from "@/lib/format";
 import { ensureSchema } from "@/lib/dbInit";
 import { getSessionUser } from "@/lib/auth";
+import { hasSiteAccess, telegramStatus } from "@/lib/telegram";
 import { getSubscribeState } from "@/lib/subscriptions";
 import { listComments } from "@/lib/comments";
 import { Eye, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
@@ -42,6 +45,7 @@ export default async function WatchPage({
       uploader: videos.uploader,
       fileSize: videos.fileSize,
       thumbnail: videos.thumbnail,
+      embedUrl: videos.embedUrl,
       views: videos.views,
       likes: videos.likes,
       dislikes: videos.dislikes,
@@ -60,6 +64,9 @@ export default async function WatchPage({
   const verified = verifiedSet.has(video.uploader.toLowerCase());
 
   const viewer = await getSessionUser();
+  // Bramka Telegram: bez kodu z bota film się nie odtworzy.
+  const allowed = await hasSiteAccess(viewer);
+  const telegram = await telegramStatus(viewer);
   const initialComments = await listComments(videoId, viewer);
   const subscribe = await getSubscribeState(video.uploader, viewer);
 
@@ -71,6 +78,7 @@ export default async function WatchPage({
       uploader: videos.uploader,
       durationSeconds: videos.durationSeconds,
       thumbnail: videos.thumbnail,
+      embedUrl: videos.embedUrl,
       views: videos.views,
       likes: videos.likes,
       dislikes: videos.dislikes,
@@ -100,15 +108,34 @@ export default async function WatchPage({
         <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
           {/* Player + info */}
           <div className="animate-fade-up min-w-0">
-            <IntroPlayer
-              src={`/api/videos/${video.id}/file`}
-              poster={video.thumbnail}
-              title={video.title}
-              uploader={video.uploader}
-            />
+            {!allowed ? (
+              <TelegramGate status={telegram} />
+            ) : video.embedUrl ? (
+              <EmbedIntroPlayer
+                embedUrl={video.embedUrl}
+                provider={(() => {
+                  try {
+                    return new URL(video.embedUrl).hostname.replace(/^www\./, "");
+                  } catch {
+                    return undefined;
+                  }
+                })()}
+                title={video.title}
+                poster={video.thumbnail}
+              />
+            ) : (
+              <IntroPlayer
+                src={`/api/videos/${video.id}/file`}
+                poster={video.thumbnail}
+                title={video.title}
+                uploader={video.uploader}
+              />
+            )}
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
-              Intro PolHub jest częścią każdego filmu — dodawane automatycznie na początku
+              {video.embedUrl
+                ? "Intro PolHub leci przed filmem — potem odtwarza się embed z serwisu źródłowego"
+                : "Intro PolHub jest częścią każdego filmu — dodawane automatycznie na początku"}
             </p>
 
             <h1 className="mt-4 font-display text-xl font-extrabold leading-snug text-white sm:text-2xl">
@@ -124,7 +151,7 @@ export default async function WatchPage({
               </span>
               <span className="flex items-center gap-1.5">
                 <HardDrive className="h-4 w-4" />
-                {(video.fileSize / (1024 * 1024)).toFixed(1)} MB
+                {video.embedUrl ? "Embed (film na zewnętrznym serwisie)" : `${(video.fileSize / (1024 * 1024)).toFixed(1)} MB`}
               </span>
               <Link
                 href={`/?cat=${encodeURIComponent(video.category)}`}

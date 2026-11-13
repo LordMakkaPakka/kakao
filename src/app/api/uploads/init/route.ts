@@ -3,6 +3,7 @@ import { getUserFromRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/dbInit";
 import { CHUNK_SIZE, createPendingUpload, MAX_UPLOAD_SIZE } from "@/lib/uploadStore";
 import { bannedResponse } from "@/lib/moderation";
+import { hasSiteAccess } from "@/lib/telegram";
 
 export async function POST(req: NextRequest) {
   await ensureSchema();
@@ -16,6 +17,13 @@ export async function POST(req: NextRequest) {
 
   const blocked = await bannedResponse(user);
   if (blocked) return blocked;
+
+  if (!(await hasSiteAccess(user))) {
+    return NextResponse.json(
+      { error: "Najpierw odblokuj dostęp kodem z Telegrama." },
+      { status: 403 }
+    );
+  }
 
   const body = (await req.json().catch(() => null)) as {
     fileName?: string;
