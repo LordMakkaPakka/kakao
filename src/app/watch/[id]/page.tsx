@@ -6,7 +6,6 @@ import { users, videos } from "@/db/schema";
 import { getVerifiedSet } from "@/lib/verification";
 import VideoCard from "@/components/VideoCard";
 import WatchActions from "@/components/WatchActions";
-import IntroPlayer from "@/components/IntroPlayer";
 import EmbedIntroPlayer from "@/components/EmbedIntroPlayer";
 import TelegramGate from "@/components/TelegramGate";
 import CategoryBar from "@/components/CategoryBar";
@@ -19,9 +18,18 @@ import { getSessionUser } from "@/lib/auth";
 import { hasSiteAccess, telegramStatus } from "@/lib/telegram";
 import { getSubscribeState } from "@/lib/subscriptions";
 import { listComments } from "@/lib/comments";
-import { Eye, CalendarDays, HardDrive, ArrowLeft } from "lucide-react";
+import { Eye, CalendarDays, Link2, ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+/** Nazwa serwisu widoczna w ramce playera (np. „youtube.com”). */
+function providerLabel(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
 
 export default async function WatchPage({
   params,
@@ -43,7 +51,6 @@ export default async function WatchPage({
       description: videos.description,
       category: videos.category,
       uploader: videos.uploader,
-      fileSize: videos.fileSize,
       thumbnail: videos.thumbnail,
       embedUrl: videos.embedUrl,
       views: videos.views,
@@ -52,7 +59,8 @@ export default async function WatchPage({
       createdAt: videos.createdAt,
     });
 
-  if (!video) notFound();
+  // Wgrywanie plików zostało wyłączone — film bez embeda nie ma czego pokazać.
+  if (!video || !video.embedUrl) notFound();
 
   const [uploaderRow] = await db
     .select({ avatar: users.avatar })
@@ -110,32 +118,18 @@ export default async function WatchPage({
           <div className="animate-fade-up min-w-0">
             {!allowed ? (
               <TelegramGate status={telegram} />
-            ) : video.embedUrl ? (
+            ) : (
               <EmbedIntroPlayer
                 embedUrl={video.embedUrl}
-                provider={(() => {
-                  try {
-                    return new URL(video.embedUrl).hostname.replace(/^www\./, "");
-                  } catch {
-                    return undefined;
-                  }
-                })()}
-                title={video.title}
-                poster={video.thumbnail}
-              />
-            ) : (
-              <IntroPlayer
-                src={`/api/videos/${video.id}/file`}
-                poster={video.thumbnail}
+                provider={providerLabel(video.embedUrl)}
                 title={video.title}
                 uploader={video.uploader}
+                poster={video.thumbnail}
               />
             )}
             <p className="mt-2 flex items-center gap-1.5 text-xs text-ph-muted">
               <span className="inline-block h-2 w-2 rounded-sm bg-ph-orange" />
-              {video.embedUrl
-                ? "Intro PolHub leci przed filmem — potem odtwarza się embed z serwisu źródłowego"
-                : "Intro PolHub jest częścią każdego filmu — dodawane automatycznie na początku"}
+              Intro PolHub leci przed filmem, a film odtwarza się w ramce PolHub
             </p>
 
             <h1 className="mt-4 font-display text-xl font-extrabold leading-snug text-white sm:text-2xl">
@@ -150,8 +144,7 @@ export default async function WatchPage({
                 <CalendarDays className="h-4 w-4" /> {timeAgo(video.createdAt)}
               </span>
               <span className="flex items-center gap-1.5">
-                <HardDrive className="h-4 w-4" />
-                {video.embedUrl ? "Embed (film na zewnętrznym serwisie)" : `${(video.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                <Link2 className="h-4 w-4" /> Film osadzony (embed)
               </span>
               <Link
                 href={`/?cat=${encodeURIComponent(video.category)}`}

@@ -42,7 +42,7 @@ export const videos = pgTable("videos", {
   fileSize: integer("file_size").notNull().default(0),
   durationSeconds: integer("duration_seconds").notNull().default(0),
   thumbnail: text("thumbnail"), // data URL captured client-side
-  /** Adres pliku w magazynie zewnętrznym (Vercel Blob); null = dane w `data`. */
+  /** Historyczne pole (magazyn plików) — nowe filmy go nie używają. */
   fileUrl: text("file_url"),
   /** Embed z zewnętrznego serwisu (np. YouTube); null = film leży u nas. */
   embedUrl: text("embed_url"),
@@ -122,8 +122,8 @@ export type VerificationRevocation =
   typeof verificationRevocations.$inferSelect;
 
 /**
- * Trwające uploady (na Vercelu każdy fragment może trafić na inną instancję,
- * więc nie da się ich trzymać w pamięci ani w /tmp).
+ * Historyczne tabele po wgrywaniu plików (wyłączonym w tej wersji).
+ * Zostają w schemacie, żeby stare wpisy dały się usunąć bez migracji.
  */
 export const pendingUploads = pgTable("pending_uploads", {
   id: text("id").primaryKey(),

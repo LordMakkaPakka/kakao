@@ -77,29 +77,6 @@ try {
     process.exit(0);
   }
 
-  // Pliki w magazynie zewnętrznym trzeba usunąć przed wierszami w bazie.
-  const blobs = await client.query(
-    "select file_url from videos where file_url is not null"
-  );
-  if (blobs.rows.length > 0) {
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      try {
-        const { del } = await import("@vercel/blob");
-        for (const row of blobs.rows) {
-          await del(row.file_url).catch(() => {});
-        }
-        console.log(`Usunięto ${blobs.rows.length} plik(ów) z magazynu Vercel Blob.`);
-      } catch (err) {
-        console.warn("Nie udało się usunąć plików z magazynu:", err.message);
-      }
-    } else {
-      console.warn(
-        `Uwaga: ${blobs.rows.length} film(ów) leży w magazynie zewnętrznym. ` +
-          "Ustaw BLOB_READ_WRITE_TOKEN, żeby usunąć też pliki."
-      );
-    }
-  }
-
   for (const table of TABLES) {
     await client.query(`delete from ${table}`).catch((err) => {
       console.warn(`Pominięto ${table}: ${err.message}`);

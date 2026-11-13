@@ -22,7 +22,8 @@ export async function GET() {
         host: info.host,
         ssl: info.ssl,
         message:
-          "Brak zmiennej z adresem bazy. Dodaj DATABASE_URL (albo POSTGRES_URL) w ustawieniach hostingu i zrób redeploy.",
+          "Brak adresu bazy. Na Cloudflare dodaj binding HYPERDRIVE w wrangler.jsonc " +
+          "(albo sekret DATABASE_URL) i wdróż ponownie.",
       },
       { status: 503 }
     );
@@ -56,7 +57,7 @@ export async function GET() {
         database: info.database,
         message: info.configured
           ? dbFailureMessage(kind)
-          : "Brak zmiennej z adresem bazy. Dodaj DATABASE_URL (albo POSTGRES_URL) w ustawieniach hostingu i zrób redeploy.",
+          : "Brak adresu bazy. Na Cloudflare dodaj binding HYPERDRIVE w wrangler.jsonc (albo sekret DATABASE_URL) i wdróż ponownie.",
       },
       { status: 503 }
     );

@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let dbFailure: ReturnType<typeof classifyDbFailure> | null = null;
   try {
     if (!databaseInfo().configured) {
-      throw new Error("Brak zmiennej z adresem bazy (DATABASE_URL / POSTGRES_URL).");
+      throw new Error("Brak adresu bazy (HYPERDRIVE / DATABASE_URL).");
     }
     // Szybka sonda: jeśli baza odrzuca nawet „select 1”, nie ma sensu
     // renderować podstron (skończyłoby się błędem 500).

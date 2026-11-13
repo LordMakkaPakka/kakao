@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "polhub",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+
+  // Baza: Neon (Postgres) przez Cloudflare Hyperdrive.
+  // Utwórz konfigurację:  npx wrangler hyperdrive create polhub-db \
+  //   --connection-string="postgresql://user:haslo@host/baza?sslmode=require"
+  // i wklej jej id poniżej.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "WSTAW_ID_HYPERDRIVE"
+    }
+  ],
+
+  // Zmienne środowiskowe dodawaj przez `wrangler secret put` (np.
+  // TELEGRAM_BOT_TOKEN, CRON_SECRET). Adres bazy podaje binding HYPERDRIVE.
+  "vars": {}
+}
