@@ -44,6 +44,8 @@ export const videos = pgTable("videos", {
   thumbnail: text("thumbnail"), // data URL captured client-side
   /** Adres pliku w magazynie zewnętrznym (Vercel Blob); null = dane w `data`. */
   fileUrl: text("file_url"),
+  /** Embed z zewnętrznego serwisu (np. YouTube); null = film leży u nas. */
+  embedUrl: text("embed_url"),
   data: bytea("data").notNull(),
   views: integer("views").notNull().default(0),
   likes: integer("likes").notNull().default(0),
@@ -184,3 +186,37 @@ export const admins = pgTable("admins", {
 });
 
 export type Admin = typeof admins.$inferSelect;
+
+/**
+ * Dostęp do serwisu po weryfikacji przez bota Telegram.
+ * Wpis = konto odblokowane; usunięcie wpisu (sensei69) cofa dostęp,
+ * a wtedy trzeba napisać do bota po nowy kod.
+ */
+export const telegramAccess = pgTable("telegram_access", {
+  username: text("username").primaryKey(),
+  chatId: text("chat_id").notNull(),
+  telegramUsername: text("telegram_username"),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+});
+
+export type TelegramAccessRow = typeof telegramAccess.$inferSelect;
+
+/** Kody, które bot wysyła na Telegramie (jednorazowe, ważne 15 minut). */
+export const telegramCodes = pgTable("telegram_codes", {
+  code: text("code").primaryKey(),
+  chatId: text("chat_id").notNull(),
+  telegramUsername: text("telegram_username"),
+  /** Konto, które wykorzystało kod (null = jeszcze nie użyty). */
+  username: text("username"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+});
+
+export type TelegramCodeRow = typeof telegramCodes.$inferSelect;
+
+/** Drobny magazyn stanu bota (offset getUpdates, nazwa bota). */
+export const telegramState = pgTable("telegram_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});

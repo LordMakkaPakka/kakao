@@ -45,6 +45,9 @@ export function ensureSchema(): Promise<void> {
         sql`ALTER TABLE videos ADD COLUMN IF NOT EXISTS file_url TEXT`
       );
       await db.execute(
+        sql`ALTER TABLE videos ADD COLUMN IF NOT EXISTS embed_url TEXT`
+      );
+      await db.execute(
         sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until TIMESTAMP`
       );
       await db.execute(
@@ -147,6 +150,31 @@ export function ensureSchema(): Promise<void> {
           username TEXT PRIMARY KEY,
           granted_by TEXT,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS telegram_access (
+          username TEXT PRIMARY KEY,
+          chat_id TEXT NOT NULL,
+          telegram_username TEXT,
+          granted_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS telegram_codes (
+          code TEXT PRIMARY KEY,
+          chat_id TEXT NOT NULL,
+          telegram_username TEXT,
+          username TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          expires_at TIMESTAMP NOT NULL,
+          used_at TIMESTAMP
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS telegram_state (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
         )
       `);
     })().catch((err) => {

@@ -84,6 +84,8 @@ export async function wipeSite(): Promise<WipeSummary> {
     "verification_revocations",
     "verifications",
     "admins",
+    "telegram_access",
+    "telegram_codes",
     "users",
   ];
 

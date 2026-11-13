@@ -45,11 +45,21 @@ export async function fetchMe(): Promise<string | null> {
     return null;
   }
 }
+export type MeTelegram = {
+  required: boolean;
+  linked: boolean;
+  bot: string | null;
+  exempt: boolean;
+  telegramUsername: string | null;
+};
+
 export type MeInfo = {
   user: string | null;
   verified: boolean;
   sensei: boolean;
   admin: boolean;
+  /** Bramka Telegram (null, gdy serwer jej nie zwrócił). */
+  telegram?: MeTelegram | null;
 };
 
 /** Sesja + informacje o odznace (działa też bez ciasteczek). */
@@ -63,6 +73,7 @@ export async function fetchMeInfo(): Promise<MeInfo> {
       verified: data.verified === true,
       sensei: data.sensei === true,
       admin: data.admin === true || data.sensei === true,
+      telegram: data.telegram ?? null,
     };
   } catch {
     return { user: null, verified: false, sensei: false, admin: false };

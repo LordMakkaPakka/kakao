@@ -13,6 +13,7 @@ import {
   Lock,
   MessageSquare,
   Search,
+  Send,
   ShieldCheck,
   Trash2,
   Unlock,
@@ -39,6 +40,8 @@ type Account = {
   passwordFingerprint: string;
   sensei: boolean;
   admin: boolean;
+  telegramAccess: boolean;
+  telegramUsername: string | null;
 };
 
 type AdminVideo = {
@@ -340,6 +343,33 @@ export default function AdminPage() {
     }
   }
 
+  async function revokeTelegram(account: Account) {
+    setBusy(`tg-${account.username}`);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await authFetch("/api/admin/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: account.username }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się odebrać dostępu.");
+        return;
+      }
+      setInfo(
+        `Odebrano dostęp kontu ${account.username}. ` +
+          "Żeby wrócić, musi napisać do bota po nowy kod i wpisać go na stronie."
+      );
+      await load();
+    } catch {
+      setError("Błąd połączenia.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function toggleVerified(account: Account) {
     setBusy(`verify-${account.username}`);
     setError(null);
@@ -569,6 +599,18 @@ export default function AdminPage() {
                             admin
                           </span>
                         )}
+                        {a.telegramAccess && (
+                          <span
+                            title={
+                              a.telegramUsername
+                                ? `Telegram: @${a.telegramUsername}`
+                                : "Dostęp przez Telegram"
+                            }
+                            className="flex items-center gap-1 rounded bg-[#229ED9]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#7fd0f2]"
+                          >
+                            <Send className="h-3 w-3" /> TG
+                          </span>
+                        )}
                         {banned && (
                           <span className="flex items-center gap-1 rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-red-300">
                             <Ban className="h-3 w-3" /> {formatCountdown(remaining)}
@@ -635,6 +677,21 @@ export default function AdminPage() {
                             <ShieldCheck className="h-3.5 w-3.5" />
                           )}
                           {a.admin ? "Odbierz admina" : "Nadaj admina"}
+                        </button>
+                      )}
+                      {iamSensei && !a.sensei && a.telegramAccess && (
+                        <button
+                          type="button"
+                          onClick={() => revokeTelegram(a)}
+                          disabled={busy === `tg-${a.username}`}
+                          className="flex items-center gap-1.5 rounded-full border border-[#229ED9]/50 px-3 py-1.5 text-xs font-semibold text-[#7fd0f2] transition-colors hover:bg-[#229ED9]/15 disabled:opacity-60"
+                        >
+                          {busy === `tg-${a.username}` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          Odbierz dostęp TG
                         </button>
                       )}
                       {!a.sensei && (

@@ -3,18 +3,28 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LockKeyhole, LogIn, ShieldCheck, UserPlus, Loader2 } from "lucide-react";
-import { fetchMe } from "@/lib/clientAuth";
+import { fetchMeInfo } from "@/lib/clientAuth";
 import UploadForm from "@/components/UploadForm";
+import TelegramGate from "@/components/TelegramGate";
+import type { TelegramStatus } from "@/lib/telegram";
 
-export default function UploadGate({ initialUser }: { initialUser: string | null }) {
+export default function UploadGate({
+  initialUser,
+  initialTelegram,
+}: {
+  initialUser: string | null;
+  initialTelegram: TelegramStatus | null;
+}) {
   const [user, setUser] = useState<string | null>(initialUser);
+  const [telegram, setTelegram] = useState<TelegramStatus | null>(initialTelegram);
   const [checking, setChecking] = useState(initialUser === null);
 
   useEffect(() => {
     let alive = true;
-    fetchMe().then((u) => {
+    fetchMeInfo().then((info) => {
       if (!alive) return;
-      if (u) setUser(u);
+      if (info.user) setUser(info.user);
+      if (info.telegram) setTelegram(info.telegram);
       setChecking(false);
     });
     return () => {
@@ -77,11 +87,15 @@ export default function UploadGate({ initialUser }: { initialUser: string | null
         </h1>
         <p className="mt-2 text-sm text-ph-muted">
           Witaj, <span className="font-bold text-ph-orange">{user}</span>! Śmiało —
-          pliki wysyłane są w kawałkach (maks. 200 MB), a każdy film dostaje
-          automatycznie intro PolHub z bębnem. 🥁
+          możesz wrzucić plik (maks. 200 MB) albo wkleić embed z innego
+          serwisu — każdy film dostaje intro PolHub z bębnem. 🥁
         </p>
       </div>
-      <UploadForm />
+      {telegram?.required && !telegram.linked && !telegram.exempt ? (
+        <TelegramGate status={telegram} />
+      ) : (
+        <UploadForm />
+      )}
     </div>
   );
 }

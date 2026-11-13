@@ -7,6 +7,7 @@ import { ensureSchema } from "@/lib/dbInit";
 import { isVerifiedAccount } from "@/lib/verification";
 import { getBanState, isAdmin } from "@/lib/moderation";
 import { isSensei } from "@/lib/verified";
+import { telegramStatus } from "@/lib/telegram";
 
 export async function GET(req: NextRequest) {
   const user = getUserFromRequest(req);
@@ -49,8 +50,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  const telegram = await telegramStatus(user);
+
   return NextResponse.json({
     user,
+    telegram,
     verified,
     sensei: isSensei(user),
     admin,

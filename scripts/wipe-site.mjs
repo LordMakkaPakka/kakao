@@ -45,6 +45,8 @@ const TABLES = [
   "verification_revocations",
   "verifications",
   "admins",
+  "telegram_access",
+  "telegram_codes",
   "users",
 ];
 

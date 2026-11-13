@@ -4,6 +4,7 @@ import { db } from "@/db";
 import {
   admins,
   comments,
+  telegramAccess,
   users,
   verificationRevocations,
   verifications,
@@ -206,6 +207,10 @@ export type AdminAccountRow = {
   passwordFingerprint: string;
   sensei: boolean;
   admin: boolean;
+  /** Nazwa na Telegramie, jeśli konto ma odblokowany dostęp (bramka). */
+  telegramUsername: string | null;
+  /** Czy konto ma dostęp przez Telegram. */
+  telegramAccess: boolean;
 };
 
 export type AdminVideoRow = {
@@ -248,6 +253,15 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
   const cmts = await db.select({ username: comments.username }).from(comments);
   const verifiedSet = await getVerifiedSet();
   const adminSet = await getAdminSet();
+  const accessRows = await db
+    .select({
+      username: telegramAccess.username,
+      telegramUsername: telegramAccess.telegramUsername,
+    })
+    .from(telegramAccess);
+  const accessMap = new Map(
+    accessRows.map((r) => [r.username.trim().toLowerCase(), r.telegramUsername])
+  );
 
   const videoCount = new Map<string, number>();
   for (const v of vids)
@@ -269,6 +283,8 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
     remainingMs: row.bannedUntil
       ? Math.max(0, row.bannedUntil.getTime() - Date.now())
       : 0,
+    telegramAccess: accessMap.has(row.username.trim().toLowerCase()),
+    telegramUsername: accessMap.get(row.username.trim().toLowerCase()) ?? null,
     passwordFingerprint: `${row.passwordHash.slice(0, 8)}…${row.passwordHash.slice(-4)}`,
     sensei: isSensei(row.username),
     admin: adminSet.has(row.username.toLowerCase()),
@@ -286,6 +302,8 @@ export async function listAccounts(): Promise<AdminAccountRow[]> {
       registered: false,
       createdAt: "",
       hasAvatar: false,
+      telegramAccess: false,
+      telegramUsername: null,
       videos: 0,
       comments: 0,
       bannedUntil: null,
